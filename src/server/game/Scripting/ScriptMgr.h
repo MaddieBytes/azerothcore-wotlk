@@ -195,6 +195,12 @@ public: /* MapScript */
     void OnPlayerEnterMap(Map* map, Player* player);
     void OnPlayerLeaveMap(Map* map, Player* player);
     void OnMapUpdate(Map* map, uint32 diff);
+    // @tswow-begin: generic delayed map update dispatch
+    void OnMapDelayedUpdate(Map* map, uint32 diff);
+    // @tswow-end
+    // @tswow-begin: map encounter-entry notification
+    void OnMapCheckEncounter(Map* map, Player* player);
+    // @tswow-end
 
 public: /* InstanceMapScript */
     InstanceScript* CreateInstanceScript(InstanceMap* map);
@@ -219,6 +225,9 @@ public: /* CreatureScript */
     uint32 GetDialogStatus(Player* player, Creature* creature);
     CreatureAI* GetCreatureAI(Creature* creature);
     void OnCreatureUpdate(Creature* creature, uint32 diff);
+    // @tswow-begin: cancellable creature world-add hook
+    bool CanCreatureAddWorld(Creature* creature);
+    // @tswow-end
     void OnCreatureAddWorld(Creature* creature);
     void OnCreatureRemoveWorld(Creature* creature);
     void OnFfaPvpStateUpdate(Creature* creature, bool InPvp);
@@ -237,6 +246,15 @@ public: /* GameObjectScript */
     void OnGameObjectStateChanged(GameObject* go, uint32 state);
     void OnGameObjectUpdate(GameObject* go, uint32 diff);
     GameObjectAI* GetGameObjectAI(GameObject* go);
+    // @tswow-begin: cancellable game-object world-add hook
+    bool CanGameObjectAddWorld(GameObject* go);
+    // @tswow-end
+    // @tswow-begin: generic game-object interaction and loot notifications
+    bool CanGameObjectUse(GameObject* go, Unit* user);
+    void OnGameObjectDialogStatus(GameObject* go, Player* player);
+    void OnGameObjectGenerateLoot(GameObject* go, Player* player);
+    void OnGameObjectGenerateFishLoot(GameObject* go, Player* player, Loot* loot, bool junk);
+    // @tswow-end
     void OnGameObjectAddWorld(GameObject* go);
     void OnGameObjectRemoveWorld(GameObject* go);
 
@@ -271,6 +289,15 @@ public: /* AuctionHouseScript */
 
 public: /* ConditionScript */
     bool OnConditionCheck(Condition* condition, ConditionSourceInfo& sourceInfo);
+    // @tswow-begin: global mutable condition evaluation dispatch
+    void OnConditionEvaluation(Condition* condition, ConditionSourceInfo& sourceInfo, bool& result);
+    // @tswow-end
+
+public: /* AllSmartScript */
+    // @tswow-begin: generic SmartAI action lifecycle dispatch
+    void OnSmartAction(uint32 actionType, SmartActionPhase phase, SmartActionContext& context,
+        bool& cancelAction, bool& cancelLink);
+    // @tswow-end
 
 public: /* VehicleScript */
     void OnInstall(Vehicle* veh);
@@ -291,7 +318,10 @@ public: /* TransportScript */
     void OnRelocate(Transport* transport, uint32 waypointId, uint32 mapId, float x, float y, float z);
 
 public: /* AchievementCriteriaScript */
-    bool OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target, uint32 criteria_id);
+    // @tswow-begin: preserve criteria misc value for generic hooks
+    bool OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target, uint32 criteria_id,
+        uint32 miscValue = 0);
+    // @tswow-end
 
 public: /* PlayerScript */
     void OnPlayerJustDied(Player* player);
@@ -308,9 +338,18 @@ public: /* PlayerScript */
     void OnPlayerLevelChanged(Player* player, uint8 oldLevel);
     void OnPlayerFreeTalentPointsChanged(Player* player, uint32 newPoints);
     void OnPlayerTalentsReset(Player* player, bool noCost);
+    // @tswow-begin: exact talent lifecycle hooks
+    void OnPlayerBeforeTalentsReset(Player* player, bool& noCost);
+    void OnPlayerAfterTalentsReset(Player* player, bool noCost);
+    bool CanPlayerLearnTalentSpell(Player* player, TalentEntry const* talent, uint32 rank,
+        SpellInfo const* spellInfo);
+    // @tswow-end
     bool OnPlayerCanLearnTalent(Player* player, TalentEntry const* talent, uint32 rank);
     void OnPlayerAfterSpecSlotChanged(Player* player, uint8 newSlot);
     void OnPlayerMoneyChanged(Player* player, int32& amount);
+    // @tswow-begin: notify modules when a player reaches a configured money cap
+    void OnPlayerMoneyLimit(Player* player, int32 amount);
+    // @tswow-end
     void OnPlayerBeforeLootMoney(Player* player, Loot* loot);
     void OnPlayerBeforeSendLoot(Player* player, ObjectGuid lootGuid, Loot* loot);
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource);
@@ -336,6 +375,9 @@ public: /* PlayerScript */
     void OnPlayerFailedDelete(ObjectGuid guid, uint32 accountId);
     void OnPlayerBindToInstance(Player* player, Difficulty difficulty, uint32 mapid, bool permanent);
     void OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newArea);
+    // @tswow-begin: movie completion lifecycle hook
+    void OnPlayerMovieComplete(Player* player, uint32 movieId);
+    // @tswow-end
     void OnPlayerUpdateArea(Player* player, uint32 oldArea, uint32 newArea);
     bool OnPlayerBeforeTeleport(Player* player, uint32 mapid, float x, float y, float z, float orientation, uint32 options, Unit* target);
     void OnPlayerUpdateFaction(Player* player);
@@ -350,11 +392,32 @@ public: /* PlayerScript */
     void OnPlayerCriteriaSave(CharacterDatabaseTransaction trans, Player* player, uint16 critId, CriteriaProgress criteriaData);
     void OnPlayerGossipSelect(Player* player, uint32 menu_id, uint32 sender, uint32 action);
     void OnPlayerGossipSelectCode(Player* player, uint32 menu_id, uint32 sender, uint32 action, char const* code);
+    // @tswow-begin: cancellable player gossip hooks
+    bool CanPlayerGossipSelect(Player* player, uint32 menuId, uint32 sender, uint32 action);
+    bool CanPlayerGossipSelectCode(Player* player, uint32 menuId, uint32 sender, uint32 action,
+        char const* code);
+    // @tswow-end
     void OnPlayerBeingCharmed(Player* player, Unit* charmer, uint32 oldFactionId, uint32 newFactionId);
     void OnPlayerAfterSetVisibleItemSlot(Player* player, uint8 slot, Item* item);
     void OnPlayerAfterMoveItemFromInventory(Player* player, Item* it, uint8 bag, uint8 slot, bool update);
     void OnPlayerAfterMoveItemToInventory(Player* player, Item* it, bool update);
     void OnPlayerEquip(Player* player, Item* it, uint8 bag, uint8 slot, bool update);
+    // @tswow-begin: item equip completion with merge state
+    void OnPlayerItemEquipped(Player* player, Item* item, uint8 slot, bool isMerge);
+    // @tswow-begin: generic player item lifecycle dispatch
+    void OnPlayerItemLifecycle(Player* player, PlayerItemLifecycleEvent type, Item* item = nullptr,
+        ItemTemplate const* itemTemplate = nullptr, WorldObject* lootedObject = nullptr,
+        uint8 bag = 0, uint8 slot = 0, bool flag = false, uint32* result = nullptr,
+        int32* signedResult = nullptr, bool* boolResult = nullptr);
+    void OnPlayerFormulaCalculation(Player* player, PlayerFormulaEvent type, uint8* byteValue = nullptr,
+        float* floatValue = nullptr, int32* intValue = nullptr, uint32 argument1 = 0,
+        uint32 argument2 = 0, uint32 argument3 = 0, uint32 argument4 = 0,
+        uint32 argument5 = 0, bool flag = false);
+    void OnPlayerLootLifecycle(Player* player, PlayerLootLifecycleEvent type, Item* item = nullptr,
+        Loot* loot = nullptr, WorldObject* source = nullptr, LootItem* lootItem = nullptr,
+        uint32 lootType = 0);
+    // @tswow-end
+    // @tswow-end
     void OnPlayerUnequip(Player* player, Item* it);
     void OnPlayerJoinBG(Player* player);
     void OnPlayerJoinArena(Player* player);
@@ -375,6 +438,15 @@ public: /* PlayerScript */
     void OnPlayerAfterStoreOrEquipNewItem(Player* player, uint32 vendorslot, Item* item, uint8 count, uint8 bag, uint8 slot, ItemTemplate const* pProto, Creature* pVendor, VendorItem const* crItem, bool bStore);
     void OnPlayerAfterUpdateMaxPower(Player* player, Powers& power, float& value);
     void OnPlayerAfterUpdateMaxHealth(Player* player, float& value);
+    // @tswow-begin: generic mutable player stat calculations
+    void OnPlayerFloatStatCalculation(Player* player, PlayerStatCalculation type, float& value,
+        float argument = 0.0f, float secondaryArgument = 0.0f);
+    void OnPlayerIntStatCalculation(Player* player, PlayerStatCalculation type, int32& value,
+        uint32 argument = 0, Item* item = nullptr);
+    void OnPlayerUIntStatCalculation(Player* player, PlayerStatCalculation type, uint32& value);
+    void OnPlayerManaRegenCalculation(Player* player, float& spiritRegen, float& flatRegen,
+        int32& interruptPercent);
+    // @tswow-end
     void OnPlayerBeforeUpdateAttackPowerAndDamage(Player* player, float& level, float& val2, bool ranged);
     void OnPlayerAfterUpdateAttackPowerAndDamage(Player* player, float& level, float& base_attPower, float& attPowerMod, float& attPowerMultiplier, bool ranged);
     void OnPlayerBeforeInitTalentForLevel(Player* player, uint8& level, uint32& talentPointsForLevel);
@@ -442,6 +514,10 @@ public: /* PlayerScript */
     bool OnPlayerCanJoinLfg(Player* player, uint8 roles, lfg::LfgDungeonSet& dungeons, std::string const& comment);
     bool OnPlayerCanEnterMap(Player* player, MapEntry const* entry, InstanceTemplate const* instance, MapDifficulty const* mapDiff, bool loginCheck);
     bool OnPlayerCanInitTrade(Player* player, Player* target);
+    // @tswow-begin: completed player trade notification
+    void OnPlayerTradeCompleted(Player* player, Player* trader, Item* const* playerItems,
+        Item* const* traderItems, uint8 itemCount, uint32 playerMoney, uint32 traderMoney);
+    // @tswow-end
     bool OnPlayerCanSetTradeItem(Player* player, Item* tradedItem, uint8 tradeSlot);
     void OnPlayerSetServerSideVisibility(Player* player, ServerSideVisibilityType& type, AccountTypes& sec);
     void OnPlayerSetServerSideVisibilityDetect(Player* player, ServerSideVisibilityType& type, AccountTypes& sec);
@@ -457,6 +533,11 @@ public: /* PlayerScript */
     void OnPlayerLeaveCombat(Player* player);
     void OnPlayerQuestAbandon(Player* player, uint32 questId);
     void OnPlayerQuestAccept(Player* player, Quest const* quest);
+    // @tswow-begin: generic quest state notifications
+    void OnPlayerQuestStatusChanged(Player* player, Quest const* quest);
+    void OnPlayerQuestObjectiveProgress(Player* player, Quest const* quest, uint32 objectiveIndex,
+        uint16 progress);
+    // @tswow-end
     bool OnPlayerCanSendErrorAlreadyLooted(Player* player);
     void OnPlayerAfterCreatureLoot(Player* player);
     void OnPlayerAfterCreatureLootMoney(Player* player);
@@ -573,6 +654,16 @@ public: /* UnitScript */
     void OnUnitEnterCombat(Unit* unit, Unit* victim);
     void OnUnitExitCombat(Unit* unit);
     void OnUnitDeath(Unit* unit, Unit* killer);
+    // @tswow-begin: early unit death lifecycle hook
+    void OnUnitDeathEarly(Unit* unit, Unit* killer);
+    // @tswow-end
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    void OnUnitLifecycle(Unit* unit, UnitLifecycleEvent type, Unit* other = nullptr,
+        SpellInfo const* spellInfo = nullptr, CalcDamageInfo* damageInfo = nullptr,
+        float* floatValue = nullptr, uint32* uintValue = nullptr, bool* boolValue = nullptr,
+        uint64 firstValue = 0, uint64 secondValue = 0, uint32 argument = 0,
+        uint32 secondaryArgument = 0, bool flag = false);
+    // @tswow-end
     void OnUnitSetShapeshiftForm(Unit* unit, uint8 form);
 
 public: /* MovementHandlerScript */
@@ -583,6 +674,27 @@ public: /* AllCreatureScript */
     //void OnAllCreatureUpdate(Creature* creature, uint32 diff);
     void OnBeforeCreatureSelectLevel(CreatureTemplate const* cinfo, Creature* creature, uint8& level);
     void OnCreatureSelectLevel(CreatureTemplate const* cinfo, Creature* creature);
+    // @tswow-begin: generic mutable creature stat calculations
+    void OnCreatureFloatStatCalculation(Creature* creature, CreatureStatCalculation type, float& value,
+        bool isGuardian, float argument = 0.0f);
+    void OnCreatureUIntStatCalculation(Creature* creature, CreatureStatCalculation type, uint32& value,
+        float modifier = 0.0f, uint32 base = 0);
+    void OnCreatureBaseDamageCalculation(Creature* creature, float& minimum, float& maximum,
+        float baseDamage);
+    void OnCreatureBaseAttackPowerCalculation(Creature* creature, uint32& attackPower,
+        uint32& rangedAttackPower);
+    void OnCreatureAttackPowerCalculation(Creature* creature, float& base, float& modifier,
+        float& multiplier, bool isGuardian, bool ranged);
+    void OnCreatureDamageCalculation(Creature* creature, float& minimum, float& maximum,
+        bool isGuardian, uint8 attackType);
+    // @tswow-end
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    void OnCreatureLifecycle(Creature* creature, CreatureLifecycleEvent type, WorldObject* primary = nullptr,
+        WorldObject* secondary = nullptr, uint32 value = 0, uint32 secondaryValue = 0, bool apply = false,
+        SpellInfo const* spellInfo = nullptr, Loot* loot = nullptr,
+        ItemTemplate const* itemTemplate = nullptr, bool* mutableResult = nullptr,
+        uint32* mutableValue = nullptr);
+    // @tswow-end
     void OnCreatureSaveToDB(Creature* creature);
 
 public: /* AllGameobjectScript */
@@ -591,6 +703,19 @@ public: /* AllGameobjectScript */
 public: /* AllMapScript */
     void OnBeforeCreateInstanceScript(InstanceMap* instanceMap, InstanceScript** instanceData, bool load, std::string data, uint32 completedEncounterMask);
     void OnDestroyInstance(MapInstanced* mapInstanced, Map* map);
+    // @tswow-begin: generic instance lifecycle dispatch
+    void OnInstanceLifecycle(InstanceMap* map, InstanceScript* instanceScript, InstanceLifecycleEvent type,
+        Player* player = nullptr, uint32 value = 0, uint32 secondaryValue = 0, bool flag = false,
+        uint32* mutableValue = nullptr);
+    // @tswow-end
+    // @tswow-begin: generic initial instance world-state dispatch
+    void OnInstanceFillInitialWorldStates(InstanceMap* map, InstanceScript* instanceScript,
+        WorldPackets::WorldState::InitWorldStates& packet);
+    // @tswow-end
+    // @tswow-begin: mutable instance boss-access dispatch
+    void OnInstanceCanKillBoss(InstanceMap* map, InstanceScript* instanceScript, uint32 bossId,
+        Player* player, bool& canKill);
+    // @tswow-end
 
 public: /* BattlefieldScript */
     void OnBattlefieldPlayerEnterZone(Battlefield* bf, Player* player);
@@ -602,6 +727,16 @@ public: /* BattlefieldScript */
     void OnBattlefieldPlayerKill(Battlefield* bf, Player* killer, Player* victim);
 
 public: /* BGScript */
+    // @tswow-begin: generic battleground lifecycle dispatch
+    void OnBattlegroundLifecycle(Battleground* bg, BattlegroundLifecycleEvent type, Player* player = nullptr,
+        uint32* value = nullptr, uint32 secondaryValue = 0, bool flag = false, bool* result = nullptr);
+    // @tswow-end
+    // @tswow-begin: mutable battleground spawn dispatch
+    void OnBattlegroundSpawn(Battleground* bg, BattlegroundSpawnEvent type, uint32 slot,
+        uint32& entry, uint8* stateOrTeam, float& x, float& y, float& z, float& o,
+        float* rotation0 = nullptr, float* rotation1 = nullptr, float* rotation2 = nullptr,
+        float* rotation3 = nullptr, uint32* respawnTime = nullptr);
+    // @tswow-end
     void OnBattlegroundStart(Battleground* bg);
     void OnBattlegroundEndReward(Battleground* bg, Player* player, TeamId winnerTeamId);
     void OnBattlegroundUpdate(Battleground* bg, uint32 diff);
@@ -623,6 +758,9 @@ public: /* BGScript */
     void OnBattlegroundSetup(Battleground* bg);
     bool CanAddGroupToMatchingPool(BattlegroundQueue* queue, GroupQueueInfo* group, uint32 poolPlayerCount, Battleground* bg, BattlegroundBracketId bracketId);
     bool GetPlayerMatchmakingRating(ObjectGuid playerGuid, BattlegroundTypeId bgTypeId, float& outRating);
+    // @tswow-begin: mutable battleground score serialization hook
+    bool CanAppendBattlegroundScore(Battleground* bg, BattlegroundScore* score, WorldPacket& packet);
+    // @tswow-end
 
 public: /* Arena Team Script */
     void OnGetSlotByType(const uint32 type, uint8& slot);
@@ -647,7 +785,53 @@ public: /* SpellSC */
     void OnSpellCastCancel(Spell* spell, Unit* caster, SpellInfo const* spellInfo, bool bySelf);
     void OnSpellCast(Spell* spell, Unit* caster, SpellInfo const* spellInfo, bool skipCheck);
     void OnSpellPrepare(Spell* spell, Unit* caster, SpellInfo const* spellInfo);
+    // @tswow-begin: generic spell script lifecycle dispatch
+    bool OnSpellLifecycle(Spell* spell, SpellLifecycleEvent type, uint32 value = 0,
+        Player* player = nullptr, Quest const* quest = nullptr, bool* boolValue = nullptr,
+        float* floatValue = nullptr);
+    // @tswow-end
+    // @tswow-begin: generic aura script lifecycle dispatch
+    bool OnAuraLifecycle(Aura* aura, AuraLifecycleEvent type, AuraEffect const* effect = nullptr,
+        AuraApplication const* application = nullptr, Unit* target = nullptr, DispelInfo* dispelInfo = nullptr,
+        DamageInfo* damageInfo = nullptr, ProcEventInfo* procInfo = nullptr, int32* intValue = nullptr,
+        uint32* uintValue = nullptr, bool* boolValue = nullptr, SpellModifier* spellModifier = nullptr,
+        uint32 mode = 0, float* floatValue = nullptr);
+    // @tswow-end
 
+    // @tswow-begin: generic spell calculation dispatch
+    void OnSpellCalculation(SpellInfo const* spellInfo, SpellCalculationEvent type,
+        WorldObject* caster = nullptr, Unit* target = nullptr, Spell* spell = nullptr,
+        float* floatValue = nullptr, int32* intValue = nullptr, uint32* uintValue = nullptr,
+        uint32* secondaryUIntValue = nullptr, uint8 attackType = 0, int32 argument = 0);
+    // @tswow-begin: cancellable spell effect dispatch
+    bool CanHandleSpellEffect(Spell* spell, SpellEffectInfo const* effect, uint32 mode,
+        Unit* unitTarget = nullptr, Item* itemTarget = nullptr, GameObject* gameObjectTarget = nullptr,
+        Corpse* corpseTarget = nullptr);
+    // @tswow-end
+    // @tswow-begin: generic spell damage lifecycle dispatch
+    void OnSpellDamage(Spell* spell, SpellDamagePhase phase, SpellNonMeleeDamage* damageInfo,
+        int32* earlyDamage, uint32* lateDamage, uint8 attackType, bool critical, uint32 effectMask);
+    // @tswow-end
+    // @tswow-begin: generic spell target-selection dispatch
+    bool CanSelectSpellObjectAreaTarget(Spell* spell, std::list<WorldObject*>& targets,
+        uint32 effectIndex, SpellImplicitTargetInfo const& targetType);
+    bool CanSelectSpellObjectTarget(Spell* spell, WorldObject*& target, uint32 effectIndex,
+        SpellImplicitTargetInfo const& targetType);
+    bool CanSelectSpellDestinationTarget(Spell* spell, SpellDestination& target, uint32 effectIndex,
+        SpellImplicitTargetInfo const& targetType);
+    // @tswow-end
+    // @tswow-begin: generic player spellbook dispatch
+    void OnSpellLearn(SpellInfo const* spellInfo, Player* player, bool active, bool disabled,
+        bool superseded, uint32 fromSkill);
+    void OnSpellUnlearn(SpellInfo const* spellInfo, Player* player, bool disabled, bool learnLowRank);
+    void OnSpellUnlearnTalent(SpellInfo const* spellInfo, Player* player, uint32 tabIndex,
+        uint32 tier, uint32 column, uint32 rank, bool direct);
+    // @tswow-end
+    // @tswow-begin: mutable spell resistance and absorption dispatch
+    bool CanCalculateSpellResistAbsorb(Spell* spell, DamageInfo const& damageInfo,
+        uint32& resistAmount, int32& absorbAmount);
+    // @tswow-end
+    // @tswow-end
 public: /* GameEventScript */
     void OnGameEventStart(uint16 EventID);
     void OnGameEventStop(uint16 EventID);
@@ -656,6 +840,20 @@ public: /* GameEventScript */
 public: /* MailScript */
     void OnBeforeMailDraftSendMailTo(MailDraft* mailDraft, MailReceiver const& receiver, MailSender const& sender, MailCheckMask& checked, uint32& deliver_delay, uint32& custom_expiration, bool& deleteMailItemsFromDB, bool& sendMail);
 
+    // @tswow-begin: mutable battleground type selection
+    void OnBattlegroundTypeSelection(uint32 candidateType, float* weight = nullptr,
+        uint32 originalType = 0, uint32* selectedType = nullptr);
+    // @tswow-begin: battleground objective action dispatch
+    void OnBattlegroundAction(Battleground* bg, BattlegroundActionEvent type,
+        Player* player, GameObject* target = nullptr);
+    // @tswow-end
+    // @tswow-begin: battleground criteria and generic-event dispatch
+    void OnBattlegroundAchievementCriteria(Battleground* bg, uint32 criteriaId, Player* source,
+        Unit* target, uint32 miscValue, bool& handled);
+    void OnBattlegroundGenericEvent(Battleground* bg, WorldObject* object, uint32 eventId,
+        WorldObject* invoker);
+    // @tswow-end
+    // @tswow-end
 public: /* AchievementScript */
 
     void SetRealmCompleted(AchievementEntry const* achievement);
@@ -663,6 +861,11 @@ public: /* AchievementScript */
     bool IsRealmCompleted(AchievementGlobalMgr const* globalmgr, AchievementEntry const* achievement, std::chrono::system_clock::time_point completionTime);
     void OnBeforeCheckCriteria(AchievementMgr* mgr, AchievementCriteriaEntryList const* achievementCriteriaList);
     bool CanCheckCriteria(AchievementMgr* mgr, AchievementCriteriaEntry const* achievementCriteria);
+    // @tswow-begin: achievement progress update dispatch
+    void OnAchievementCriteriaProgress(Player* player, AchievementEntry const* achievement,
+        AchievementCriteriaEntry const* criteria, uint32 progressType, uint32 timeElapsed,
+        bool timedCompleted);
+    // @tswow-end
 
 public: /* PetScript */
 

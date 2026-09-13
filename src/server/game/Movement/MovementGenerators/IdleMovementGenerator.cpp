@@ -73,7 +73,9 @@ void RotateMovementGenerator::Finalize(Unit* unit)
 {
     unit->ClearUnitState(UNIT_STATE_ROTATING);
     if (unit->IsCreature())
-        unit->ToCreature()->AI()->MovementInform(ROTATE_MOTION_TYPE, 0);
+        // @tswow-begin: route movement completion through generic lifecycle dispatch
+        unit->ToCreature()->AI()->NotifyMovementInform(ROTATE_MOTION_TYPE, 0);
+        // @tswow-end
 }
 
 void DistractMovementGenerator::Initialize(Unit* owner)

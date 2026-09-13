@@ -60,6 +60,9 @@ struct AC_GAME_API BattlegroundScore
     friend class Battleground;
 
     public:
+    // @tswow-begin: reusable base battleground score serialization
+    virtual void AppendBaseToPacket(WorldPacket& data) const;
+    // @tswow-end
     [[nodiscard]] uint32 GetKillingBlows() const    { return KillingBlows; }
     [[nodiscard]] uint32 GetDamageDone() const      { return DamageDone; }
     [[nodiscard]] uint32 GetHealingDone() const     { return HealingDone; }

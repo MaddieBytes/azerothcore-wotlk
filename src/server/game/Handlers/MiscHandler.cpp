@@ -189,7 +189,12 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPacket& recv_data)
         }
         else
         {
-            sScriptMgr->OnPlayerGossipSelectCode(_player, menuId, _player->PlayerTalkClass->GetGossipOptionSender(gossipListId), _player->PlayerTalkClass->GetGossipOptionAction(gossipListId), code.c_str());
+            // @tswow-begin: cancellable player gossip hook
+            uint32 const sender = _player->PlayerTalkClass->GetGossipOptionSender(gossipListId);
+            uint32 const action = _player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+            if (sScriptMgr->CanPlayerGossipSelectCode(_player, menuId, sender, action, code.c_str()))
+                sScriptMgr->OnPlayerGossipSelectCode(_player, menuId, sender, action, code.c_str());
+            // @tswow-end
         }
     }
     else
@@ -212,7 +217,12 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPacket& recv_data)
         }
         else
         {
-            sScriptMgr->OnPlayerGossipSelect(_player, menuId, _player->PlayerTalkClass->GetGossipOptionSender(gossipListId), _player->PlayerTalkClass->GetGossipOptionAction(gossipListId));
+            // @tswow-begin: cancellable player gossip hook
+            uint32 const sender = _player->PlayerTalkClass->GetGossipOptionSender(gossipListId);
+            uint32 const action = _player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+            if (sScriptMgr->CanPlayerGossipSelect(_player, menuId, sender, action))
+                sScriptMgr->OnPlayerGossipSelect(_player, menuId, sender, action);
+            // @tswow-end
         }
     }
 }
@@ -752,6 +762,13 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPacket& recv_data)
     if (Battleground* bg = player->GetBattleground())
         if (bg->GetStatus() == STATUS_IN_PROGRESS)
         {
+            // @tswow-begin: mutable battleground area-trigger dispatch
+            bool handled = false;
+            sScriptMgr->OnBattlegroundLifecycle(bg, BattlegroundLifecycleEvent::AreaTrigger,
+                player, nullptr, triggerId, false, &handled);
+            if (handled)
+                return;
+            // @tswow-end
             bg->HandleAreaTrigger(player, triggerId);
             return;
         }
@@ -942,6 +959,18 @@ void WorldSession::HandleCompleteCinematic(WorldPacket& /*recv_data*/)
     // End the current cinematic and restore the normal player view
     GetPlayer()->GetCinematicMgr().EndCinematic();
 }
+
+// @tswow-begin: movie completion lifecycle hook
+void WorldSession::HandleCompleteMovie(WorldPacket& /*recv_data*/)
+{
+    uint32 movieId = GetPlayer()->GetMovie();
+    if (!movieId)
+        return;
+
+    GetPlayer()->SetMovie(0);
+    sScriptMgr->OnPlayerMovieComplete(GetPlayer(), movieId);
+}
+// @tswow-end
 
 void WorldSession::HandleNextCinematicCamera(WorldPacket& /*recv_data*/)
 {

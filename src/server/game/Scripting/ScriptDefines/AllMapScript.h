@@ -30,8 +30,42 @@ enum AllMapHook
     ALLMAPHOOK_ON_CREATE_MAP,
     ALLMAPHOOK_ON_DESTROY_MAP,
     ALLMAPHOOK_ON_MAP_UPDATE,
+    // @tswow-begin: generic delayed map update dispatch
+    ALLMAPHOOK_ON_MAP_DELAYED_UPDATE,
+    // @tswow-end
+    // @tswow-begin: generic instance lifecycle dispatch
+    ALLMAPHOOK_ON_INSTANCE_LIFECYCLE,
+    // @tswow-end
+    // @tswow-begin: map encounter-entry notification
+    ALLMAPHOOK_ON_MAP_CHECK_ENCOUNTER,
+    // @tswow-end
+    // @tswow-begin: generic initial instance world-state dispatch
+    ALLMAPHOOK_ON_INSTANCE_INITIAL_WORLD_STATES,
+    // @tswow-end
+    // @tswow-begin: mutable instance boss-access dispatch
+    ALLMAPHOOK_ON_INSTANCE_CAN_KILL_BOSS,
+    // @tswow-end
     ALLMAPHOOK_END
 };
+
+// @tswow-begin: generic instance lifecycle dispatch
+enum class InstanceLifecycleEvent : uint8
+{
+    Create,
+    Reload,
+    Load,
+    Save,
+    Update,
+    PlayerEnter,
+    PlayerLeave,
+    BossStateChange,
+    LoadBossBoundaries,
+    LoadMinionData,
+    LoadDoorData,
+    LoadObjectData,
+    SetBossNumber
+};
+// @tswow-end
 
 class AllMapScript : public ScriptObject
 {
@@ -54,6 +88,13 @@ public:
      * @param player Contains information about the Player
      */
     virtual void OnPlayerLeaveAll(Map* /*map*/, Player* /*player*/) { }
+
+    // @tswow-begin: generic delayed map update dispatch
+    virtual void OnMapDelayedUpdate(Map* /*map*/, uint32 /*diff*/) { }
+    // @tswow-begin: map encounter-entry notification
+    virtual void OnMapCheckEncounter(Map* /*map*/, Player* /*player*/) { }
+    // @tswow-end
+    // @tswow-end
 
     /**
      * @brief This hook called before create instance script
@@ -95,6 +136,20 @@ public:
      * @param diff Contains information about the diff time
      */
     virtual void OnMapUpdate(Map* /*map*/, uint32 /*diff*/) { }
+
+    // @tswow-begin: generic instance lifecycle dispatch
+    virtual void OnInstanceLifecycle(InstanceMap* /*map*/, InstanceScript* /*script*/,
+        InstanceLifecycleEvent /*type*/, Player* /*player*/ = nullptr, uint32 /*value*/ = 0,
+        uint32 /*secondaryValue*/ = 0, bool /*flag*/ = false, uint32* /*mutableValue*/ = nullptr) { }
+    // @tswow-end
+    // @tswow-begin: generic initial instance world-state dispatch
+    virtual void OnInstanceFillInitialWorldStates(InstanceMap* /*map*/, InstanceScript* /*script*/,
+        WorldPackets::WorldState::InitWorldStates& /*packet*/) { }
+    // @tswow-end
+    // @tswow-begin: mutable instance boss-access dispatch
+    virtual void OnInstanceCanKillBoss(InstanceMap* /*map*/, InstanceScript* /*script*/,
+        uint32 /*bossId*/, Player* /*player*/, bool& /*canKill*/) { }
+    // @tswow-end
 };
 
 #endif

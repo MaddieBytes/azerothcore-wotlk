@@ -269,7 +269,9 @@ public:
 
         void JustEngagedWith(Unit* who) override
         {
-            if (!instance->CheckRequiredBosses(DATA_LADY_DEATHWHISPER, who->ToPlayer()))
+            // @tswow-begin: route stock boss access through the generic module hook
+            if (!instance->CheckRequiredBossesWithScripts(DATA_LADY_DEATHWHISPER, who->ToPlayer()))
+            // @tswow-end
             {
                 EnterEvadeMode();
                 instance->DoCastSpellOnPlayers(LIGHT_S_HAMMER_TELEPORT);

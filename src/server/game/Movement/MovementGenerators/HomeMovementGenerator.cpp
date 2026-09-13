@@ -21,6 +21,9 @@
 #include "CreatureAI.h"
 #include "DisableMgr.h"
 #include "MoveSplineInit.h"
+// @tswow-begin: generic creature AI lifecycle dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 
 void HomeMovementGenerator<Creature>::DoInitialize(Creature* owner)
 {
@@ -35,6 +38,9 @@ void HomeMovementGenerator<Creature>::DoFinalize(Creature* owner)
     if (arrived)
     {
         owner->LoadCreaturesAddon(true);
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(owner, CreatureLifecycleEvent::ReachedHome);
+        // @tswow-end
         owner->AI()->JustReachedHome();
     }
 

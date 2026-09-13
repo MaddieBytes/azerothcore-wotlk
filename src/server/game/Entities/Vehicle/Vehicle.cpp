@@ -473,6 +473,10 @@ bool Vehicle::AddPassenger(Unit* unit, int8 seatId)
 
         if (_me->IsCreature())
         {
+            // @tswow-begin: generic creature AI lifecycle dispatch
+            sScriptMgr->OnCreatureLifecycle(_me->ToCreature(), CreatureLifecycleEvent::PassengerBoarded, unit,
+                nullptr, static_cast<uint32>(static_cast<uint8>(seat->first)), 0, true);
+            // @tswow-end
             if (_me->ToCreature()->IsAIEnabled)
                 _me->ToCreature()->AI()->PassengerBoarded(unit, seat->first, true);
         }
@@ -539,6 +543,11 @@ void Vehicle::RemovePassenger(Unit* unit)
     if (_me->IsCreature())
         sScriptMgr->OnRemovePassenger(this, unit);
 
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    if (_me->IsCreature())
+        sScriptMgr->OnCreatureLifecycle(_me->ToCreature(), CreatureLifecycleEvent::PassengerBoarded, unit,
+            nullptr, static_cast<uint32>(static_cast<uint8>(seat->first)), 0, false);
+    // @tswow-end
     if (_me->IsCreature() && _me->ToCreature()->IsAIEnabled)
         _me->ToCreature()->AI()->PassengerBoarded(unit, seat->first, false);
 }

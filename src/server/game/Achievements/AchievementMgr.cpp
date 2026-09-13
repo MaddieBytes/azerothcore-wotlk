@@ -359,7 +359,10 @@ bool AchievementCriteriaData::Meets(uint32 criteria_id, Player const* source, Un
                 return false;
             return target->getGender() == gender.gender;
         case ACHIEVEMENT_CRITERIA_DATA_TYPE_SCRIPT:
-            return sScriptMgr->OnCriteriaCheck(ScriptId, const_cast<Player*>(source), const_cast<Unit*>(target), criteria_id);
+            // @tswow-begin: preserve misc value for battleground criteria hooks
+            return sScriptMgr->OnCriteriaCheck(ScriptId, const_cast<Player*>(source),
+                const_cast<Unit*>(target), criteria_id, miscvalue1);
+            // @tswow-end
         case ACHIEVEMENT_CRITERIA_DATA_TYPE_MAP_DIFFICULTY:
         {
             if (source->GetMap()->IsRaid())
@@ -2180,6 +2183,12 @@ void AchievementMgr::SetCriteriaProgress(AchievementCriteriaEntry const* entry, 
         if (timedCompleted)
             _timedAchievements.erase(timedIter);
     }
+
+    // @tswow-begin: achievement progress update dispatch
+    sScriptMgr->OnAchievementCriteriaProgress(GetPlayer(),
+        sAchievementStore.LookupEntry(entry->referredAchievement), entry,
+        static_cast<uint32>(ptype), timeElapsed, timedCompleted);
+    // @tswow-end
 
     SendCriteriaUpdate(entry, progress, timeElapsed, true);
 

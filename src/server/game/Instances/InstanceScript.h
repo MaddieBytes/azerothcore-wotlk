@@ -263,6 +263,9 @@ public:
 
     // Checks boss requirements (one boss required to kill other)
     virtual bool CheckRequiredBosses(uint32 /*bossId*/, Player const* /*player*/ = nullptr) const { return true; }
+    // @tswow-begin: preserve virtual overrides while adding a generic mutable boss-access hook
+    bool CheckRequiredBossesWithScripts(uint32 bossId, Player const* player = nullptr) const;
+    // @tswow-end
 
     bool _SkipCheckRequiredBosses(Player const* player = nullptr) const;
 
@@ -305,7 +308,9 @@ public:
     TaskScheduler scheduler;
 protected:
     void SetHeaders(std::string const& dataHeaders);
-    void SetBossNumber(uint32 number) { bosses.resize(number); }
+      // @tswow-begin: mutable instance boss-count lifecycle hook
+      void SetBossNumber(uint32 number);
+      // @tswow-end
     void SetPersistentDataCount(uint32 number) { persistentData.resize(number); }
     void LoadBossBoundaries(BossBoundaryData const& data);
     void LoadDoorData(DoorData const* data);

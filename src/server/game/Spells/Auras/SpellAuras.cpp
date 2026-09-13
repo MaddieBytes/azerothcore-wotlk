@@ -902,6 +902,10 @@ int32 Aura::CalcMaxDuration(Unit* caster) const
 
 void Aura::SetDuration(int32 duration, bool withMods)
 {
+    // @tswow-begin: mutable aura duration lifecycle dispatch
+    sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::SetDuration, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, &duration, nullptr, &withMods);
+    // @tswow-end
     if (withMods)
     {
         if (Unit* caster = GetCaster())
@@ -2466,6 +2470,11 @@ void Aura::LoadScripts()
 bool Aura::CallScriptCheckAreaTargetHandlers(Unit* target)
 {
     bool result = true;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::CheckAreaTarget, nullptr, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, nullptr, &result))
+        return result;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_CHECK_AREA_TARGET);
@@ -2480,6 +2489,11 @@ bool Aura::CallScriptCheckAreaTargetHandlers(Unit* target)
 
 void Aura::CallScriptDispel(DispelInfo* dispelInfo)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::Dispel, nullptr, nullptr, nullptr,
+        dispelInfo))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_DISPEL);
@@ -2493,6 +2507,11 @@ void Aura::CallScriptDispel(DispelInfo* dispelInfo)
 
 void Aura::CallScriptAfterDispel(DispelInfo* dispelInfo)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::AfterDispel, nullptr, nullptr, nullptr,
+        dispelInfo))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_AFTER_DISPEL);
@@ -2507,6 +2526,11 @@ void Aura::CallScriptAfterDispel(DispelInfo* dispelInfo)
 bool Aura::CallScriptEffectApplyHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, AuraEffectHandleModes mode)
 {
     bool preventDefault = false;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectApply, aurEff, aurApp, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, mode))
+        return preventDefault;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_APPLY, aurApp);
@@ -2527,6 +2551,11 @@ bool Aura::CallScriptEffectApplyHandlers(AuraEffect const* aurEff, AuraApplicati
 bool Aura::CallScriptEffectRemoveHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, AuraEffectHandleModes mode)
 {
     bool preventDefault = false;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectRemove, aurEff, aurApp, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, mode))
+        return preventDefault;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_REMOVE, aurApp);
@@ -2545,6 +2574,11 @@ bool Aura::CallScriptEffectRemoveHandlers(AuraEffect const* aurEff, AuraApplicat
 
 void Aura::CallScriptAfterEffectApplyHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, AuraEffectHandleModes mode)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::AfterEffectApply, aurEff, aurApp, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, mode))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_AFTER_APPLY, aurApp);
@@ -2559,6 +2593,11 @@ void Aura::CallScriptAfterEffectApplyHandlers(AuraEffect const* aurEff, AuraAppl
 
 void Aura::CallScriptAfterEffectRemoveHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, AuraEffectHandleModes mode)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::AfterEffectRemove, aurEff, aurApp, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, mode))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_AFTER_REMOVE, aurApp);
@@ -2574,6 +2613,10 @@ void Aura::CallScriptAfterEffectRemoveHandlers(AuraEffect const* aurEff, AuraApp
 bool Aura::CallScriptEffectPeriodicHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp)
 {
     bool preventDefault = false;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectPeriodic, aurEff, aurApp))
+        return preventDefault;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_PERIODIC, aurApp);
@@ -2593,6 +2636,9 @@ bool Aura::CallScriptEffectPeriodicHandlers(AuraEffect const* aurEff, AuraApplic
 
 void Aura::CallScriptEffectUpdatePeriodicHandlers(AuraEffect* aurEff)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::Tick, aurEff);
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_UPDATE_PERIODIC);
@@ -2607,6 +2653,11 @@ void Aura::CallScriptEffectUpdatePeriodicHandlers(AuraEffect* aurEff)
 
 void Aura::CallScriptEffectCalcAmountHandlers(AuraEffect const* aurEff, int32& amount, bool& canBeRecalculated)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectCalcAmount, aurEff, nullptr, nullptr,
+        nullptr, nullptr, nullptr, &amount, nullptr, &canBeRecalculated))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_CALC_AMOUNT);
@@ -2621,6 +2672,11 @@ void Aura::CallScriptEffectCalcAmountHandlers(AuraEffect const* aurEff, int32& a
 
 void Aura::CallScriptEffectCalcPeriodicHandlers(AuraEffect const* aurEff, bool& isPeriodic, int32& amplitude)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectCalcPeriodic, aurEff, nullptr, nullptr,
+        nullptr, nullptr, nullptr, &amplitude, nullptr, &isPeriodic))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_CALC_PERIODIC);
@@ -2635,6 +2691,11 @@ void Aura::CallScriptEffectCalcPeriodicHandlers(AuraEffect const* aurEff, bool& 
 
 void Aura::CallScriptEffectCalcSpellModHandlers(AuraEffect const* aurEff, SpellModifier*& spellMod)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectCalcSpellMod, aurEff, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, spellMod))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_CALC_SPELLMOD);
@@ -2649,6 +2710,11 @@ void Aura::CallScriptEffectCalcSpellModHandlers(AuraEffect const* aurEff, SpellM
 
 void Aura::CallScriptEffectAbsorbHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo& dmgInfo, uint32& absorbAmount, bool& defaultPrevented)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectAbsorb, aurEff, aurApp, nullptr,
+        nullptr, &dmgInfo, nullptr, nullptr, &absorbAmount))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_ABSORB, aurApp);
@@ -2667,6 +2733,11 @@ void Aura::CallScriptEffectAbsorbHandlers(AuraEffect* aurEff, AuraApplication co
 
 void Aura::CallScriptEffectAfterAbsorbHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo& dmgInfo, uint32& absorbAmount)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectAfterAbsorb, aurEff, aurApp, nullptr,
+        nullptr, &dmgInfo, nullptr, nullptr, &absorbAmount))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_AFTER_ABSORB, aurApp);
@@ -2681,6 +2752,11 @@ void Aura::CallScriptEffectAfterAbsorbHandlers(AuraEffect* aurEff, AuraApplicati
 
 void Aura::CallScriptEffectManaShieldHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo& dmgInfo, uint32& absorbAmount, bool& /*defaultPrevented*/)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectManaShield, aurEff, aurApp, nullptr,
+        nullptr, &dmgInfo, nullptr, nullptr, &absorbAmount))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_MANASHIELD, aurApp);
@@ -2695,6 +2771,11 @@ void Aura::CallScriptEffectManaShieldHandlers(AuraEffect* aurEff, AuraApplicatio
 
 void Aura::CallScriptEffectAfterManaShieldHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo& dmgInfo, uint32& absorbAmount)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectAfterManaShield, aurEff, aurApp, nullptr,
+        nullptr, &dmgInfo, nullptr, nullptr, &absorbAmount))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_AFTER_MANASHIELD, aurApp);
@@ -2709,6 +2790,11 @@ void Aura::CallScriptEffectAfterManaShieldHandlers(AuraEffect* aurEff, AuraAppli
 
 void Aura::CallScriptEffectSplitHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo& dmgInfo, uint32& splitAmount)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectSplit, aurEff, aurApp, nullptr,
+        nullptr, &dmgInfo, nullptr, nullptr, &splitAmount))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_SPLIT, aurApp);
@@ -2724,6 +2810,11 @@ void Aura::CallScriptEffectSplitHandlers(AuraEffect* aurEff, AuraApplication con
 bool Aura::CallScriptCheckProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
     bool result = true;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::CheckProc, nullptr, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo, nullptr, nullptr, &result))
+        return result;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_CHECK_PROC, aurApp);
@@ -2740,6 +2831,11 @@ bool Aura::CallScriptCheckProcHandlers(AuraApplication const* aurApp, ProcEventI
 bool Aura::CallScriptCheckEffectProcHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
     bool result = true;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::CheckEffectProc, aurEff, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo, nullptr, nullptr, &result))
+        return result;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_CHECK_EFFECT_PROC, aurApp);
@@ -2773,6 +2869,11 @@ bool Aura::CallScriptAfterCheckProcHandlers(AuraApplication const* aurApp, ProcE
 bool Aura::CallScriptPrepareProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
     bool prepare = true;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::PrepareProc, nullptr, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo, nullptr, nullptr, &prepare))
+        return prepare;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_PREPARE_PROC, aurApp);
@@ -2792,6 +2893,11 @@ bool Aura::CallScriptPrepareProcHandlers(AuraApplication const* aurApp, ProcEven
 bool Aura::CallScriptProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
     bool handled = false;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::Proc, nullptr, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo, nullptr, nullptr, &handled))
+        return handled;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_PROC, aurApp);
@@ -2808,6 +2914,11 @@ bool Aura::CallScriptProcHandlers(AuraApplication const* aurApp, ProcEventInfo& 
 
 void Aura::CallScriptAfterProcHandlers(AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::AfterProc, nullptr, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_AFTER_PROC, aurApp);
@@ -2822,6 +2933,11 @@ void Aura::CallScriptAfterProcHandlers(AuraApplication const* aurApp, ProcEventI
 bool Aura::CallScriptEffectProcHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
     bool preventDefault = false;
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::EffectProc, aurEff, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo))
+        return preventDefault;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_PROC, aurApp);
@@ -2840,6 +2956,11 @@ bool Aura::CallScriptEffectProcHandlers(AuraEffect const* aurEff, AuraApplicatio
 
 void Aura::CallScriptAfterEffectProcHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, ProcEventInfo& eventInfo)
 {
+    // @tswow-begin: generic aura script lifecycle dispatch
+    if (!sScriptMgr->OnAuraLifecycle(this, AuraLifecycleEvent::AfterEffectProc, aurEff, aurApp, nullptr,
+        nullptr, nullptr, &eventInfo))
+        return;
+    // @tswow-end
     for (std::list<AuraScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(AURA_SCRIPT_HOOK_EFFECT_AFTER_PROC, aurApp);

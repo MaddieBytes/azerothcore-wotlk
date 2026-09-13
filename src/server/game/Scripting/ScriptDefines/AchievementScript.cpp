@@ -44,6 +44,16 @@ bool ScriptMgr::CanCheckCriteria(AchievementMgr* mgr, AchievementCriteriaEntry c
     CALL_ENABLED_BOOLEAN_HOOKS(AchievementScript, ACHIEVEMENTHOOK_CAN_CHECK_CRITERIA, !script->CanCheckCriteria(mgr, achievementCriteria));
 }
 
+// @tswow-begin: achievement progress update dispatch
+void ScriptMgr::OnAchievementCriteriaProgress(Player* player, AchievementEntry const* achievement,
+    AchievementCriteriaEntry const* criteria, uint32 progressType, uint32 timeElapsed,
+    bool timedCompleted)
+{
+    CALL_ENABLED_HOOKS(AchievementScript, ACHIEVEMENTHOOK_ON_CRITERIA_PROGRESS,
+        script->OnCriteriaProgress(player, achievement, criteria, progressType, timeElapsed, timedCompleted));
+}
+// @tswow-end
+
 AchievementScript::AchievementScript(char const* name, std::vector<uint16> enabledHooks)
     : ScriptObject(name, ACHIEVEMENTHOOK_END)
 {

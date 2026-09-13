@@ -33,6 +33,9 @@
 #include "ObjectMgr.h"
 #include "ScriptedCreature.h"
 #include "ScriptedGossip.h"
+// @tswow-begin: generic SmartAI action lifecycle dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "SmartAI.h"
 #include "SpellMgr.h"
 #include "Vehicle.h"
@@ -216,6 +219,17 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
 
     GetTargets(targets, e, invoker);
 
+    // @tswow-begin: cancellable SmartAI action lifecycle dispatch
+    SmartActionContext tswowContext{ &e, this, unit, var0, var1, bvar, spell, gob, &targets };
+    bool cancelAction = false;
+    bool cancelLink = false;
+    sScriptMgr->OnSmartAction(static_cast<uint32>(e.GetActionType()), SmartActionPhase::Early,
+        tswowContext, cancelAction, cancelLink);
+    // @tswow-end
+
+    // @tswow-begin: allow modules to suppress the selected action while retaining optional link control
+    if (!cancelAction)
+    // @tswow-end
     switch (e.GetActionType())
     {
         case SMART_ACTION_TALK:
@@ -3423,7 +3437,11 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
             break;
     }
 
-    if (e.link && e.link != e.event_id)
+    // @tswow-begin: late SmartAI action dispatch and link cancellation
+    sScriptMgr->OnSmartAction(static_cast<uint32>(e.GetActionType()), SmartActionPhase::Late,
+        tswowContext, cancelAction, cancelLink);
+    if (!cancelLink && e.link && e.link != e.event_id)
+    // @tswow-end
     {
         auto linked = FindLinkedEvent(e.link);
         if (linked.has_value())

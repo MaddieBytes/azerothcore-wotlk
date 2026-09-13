@@ -1658,7 +1658,9 @@ public:
     [[nodiscard]] Unit* GetSelectedUnit() const;
     [[nodiscard]] Player* GetSelectedPlayer() const;
 
-    void SetTarget(ObjectGuid /*guid*/ = ObjectGuid::Empty) override { } /// Used for serverside target changes, does not apply to players
+    // @tswow-begin: generic unit target lifecycle dispatch
+    void SetTarget(ObjectGuid guid = ObjectGuid::Empty) override;
+    // @tswow-end
     void SetSelection(ObjectGuid guid);
 
     void SendMailResult(uint32 mailId, MailResponseType mailAction, MailResponseResult mailError, uint32 equipError = 0, ObjectGuid::LowType item_guid = 0, uint32 item_count = 0);
@@ -1738,6 +1740,9 @@ public:
     [[nodiscard]] uint32 GetReputation(uint32 factionentry) const;
     std::string const& GetGuildName();
     [[nodiscard]] uint32 GetFreeTalentPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS1); }
+    // @tswow-begin: expose quest-reward talent points to scripting modules
+    [[nodiscard]] uint32 GetQuestRewardTalentPoints() const { return m_questRewardTalentCount; }
+    // @tswow-end
     void SetFreeTalentPoints(uint32 points);
     bool resetTalents(bool noResetCost = false);
     [[nodiscard]] uint32 resetTalentsCost() const;
@@ -2468,6 +2473,10 @@ public:
 
     void SendCinematicStart(uint32 CinematicSequenceId) const;
     void SendMovieStart(uint32 MovieId);
+    // @tswow-begin: retain the active movie for completion callbacks
+    [[nodiscard]] uint32 GetMovie() const { return m_movie; }
+    void SetMovie(uint32 movieId) { m_movie = movieId; }
+    // @tswow-end
 
     uint32 DoRandomRoll(uint32 minimum, uint32 maximum);
 
@@ -2912,6 +2921,9 @@ protected:
     JoinedChannelsList m_channels;
 
     uint8 m_cinematic;
+    // @tswow-begin: retain the active movie for completion callbacks
+    uint32 m_movie;
+    // @tswow-end
 
     TradeData* m_trade;
 

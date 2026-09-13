@@ -19,6 +19,61 @@
 #include "ScriptMgr.h"
 #include "ScriptMgrMacros.h"
 
+// @tswow-begin: cancellable game-object world-add hook
+bool ScriptMgr::CanGameObjectAddWorld(GameObject* go)
+{
+    ASSERT(go);
+
+    bool canAdd = true;
+    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
+    {
+        if (!script->CanGameObjectAddWorld(go))
+            canAdd = false;
+    });
+    return canAdd;
+}
+// @tswow-end
+
+// @tswow-begin: generic game-object interaction and loot notifications
+bool ScriptMgr::CanGameObjectUse(GameObject* go, Unit* user)
+{
+    ASSERT(go);
+    ASSERT(user);
+
+    bool canUse = true;
+    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
+    {
+        if (!script->CanGameObjectUse(go, user))
+            canUse = false;
+    });
+    return canUse;
+}
+
+void ScriptMgr::OnGameObjectDialogStatus(GameObject* go, Player* player)
+{
+    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
+    {
+        script->OnGameObjectDialogStatus(go, player);
+    });
+}
+
+void ScriptMgr::OnGameObjectGenerateLoot(GameObject* go, Player* player)
+{
+    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
+    {
+        script->OnGameObjectGenerateLoot(go, player);
+    });
+}
+
+void ScriptMgr::OnGameObjectGenerateFishLoot(GameObject* go, Player* player, Loot* loot, bool junk)
+{
+    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
+    {
+        script->OnGameObjectGenerateFishLoot(go, player, loot, junk);
+    });
+}
+// @tswow-end
+
 void ScriptMgr::OnGameObjectAddWorld(GameObject* go)
 {
     ASSERT(go);

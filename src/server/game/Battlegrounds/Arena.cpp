@@ -31,6 +31,14 @@
 
 void ArenaScore::AppendToPacket(WorldPacket& data)
 {
+    // @tswow-begin: reusable base battleground score serialization
+    AppendBaseToPacket(data);
+    BuildObjectivesBlock(data);
+}
+
+void ArenaScore::AppendBaseToPacket(WorldPacket& data) const
+{
+    // @tswow-end
     data << PlayerGuid;
 
     data << uint32(KillingBlows);
@@ -38,7 +46,6 @@ void ArenaScore::AppendToPacket(WorldPacket& data)
     data << uint32(DamageDone);
     data << uint32(HealingDone);
 
-    BuildObjectivesBlock(data);
 }
 
 void ArenaScore::BuildObjectivesBlock(WorldPacket& data)

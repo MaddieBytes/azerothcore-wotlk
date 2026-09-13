@@ -78,6 +78,9 @@ public:
     /// For which zone is this weather?
     [[nodiscard]] uint32 GetZone() const { return m_zone; };
     [[nodiscard]] uint32 GetScriptId() const { return m_weatherChances->ScriptId; }
+    // @tswow-begin: expose weather ownership to generic module event adapters
+    [[nodiscard]] Map* GetMap() const { return m_map; }
+    // @tswow-end
 
 private:
     [[nodiscard]] WeatherState GetWeatherState() const;

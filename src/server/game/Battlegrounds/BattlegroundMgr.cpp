@@ -930,12 +930,20 @@ BattlegroundTypeId BattlegroundMgr::GetRandomBG(BattlegroundTypeId bgTypeId, uin
                 if (bg->MinLevel <= minLevel)
                 {
                     ids.push_back(bg->Id);
-                    weights.push_back(bg->Weight);
+                    float weight = bg->Weight;
+                    // @tswow-begin: mutable battleground selection weight
+                    sScriptMgr->OnBattlegroundTypeSelection(bg->Id, &weight, bgTypeId);
+                    // @tswow-end
+                    weights.push_back(weight);
                 }
             }
         }
 
-        return *Acore::Containers::SelectRandomWeightedContainerElement(ids, weights);
+        uint32 selectedType = *Acore::Containers::SelectRandomWeightedContainerElement(ids, weights);
+        // @tswow-begin: mutable battleground type selection
+        sScriptMgr->OnBattlegroundTypeSelection(selectedType, nullptr, bgTypeId, &selectedType);
+        // @tswow-end
+        return static_cast<BattlegroundTypeId>(selectedType);
     }
 
     return BATTLEGROUND_TYPE_NONE;

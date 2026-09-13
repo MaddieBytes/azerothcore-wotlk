@@ -82,6 +82,11 @@ void CombatReference::EndCombat()
     first->GetCombatManager().PurgeReference(second->GetGUID(), _isPvP);
     second->GetCombatManager().PurgeReference(first->GetGUID(), _isPvP);
 
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    sScriptMgr->OnUnitLifecycle(first, UnitLifecycleEvent::ExitCombatWith, second);
+    sScriptMgr->OnUnitLifecycle(second, UnitLifecycleEvent::ExitCombatWith, first);
+    // @tswow-end
+
     // ...update the combat state, which will potentially remove IN_COMBAT...
     bool const needFirstAI = first->GetCombatManager().UpdateOwnerCombatState();
     bool const needSecondAI = second->GetCombatManager().UpdateOwnerCombatState();
@@ -378,6 +383,10 @@ void CombatManager::EndAllPvPCombat()
 
 /*static*/ void CombatManager::NotifyAICombat(Unit* me, Unit* other)
 {
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    if (Creature* creature = me->ToCreature())
+        sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::JustEnteredCombat, other);
+    // @tswow-end
     if (UnitAI* ai = me->GetAI())
         ai->JustEnteredCombat(other);
 }

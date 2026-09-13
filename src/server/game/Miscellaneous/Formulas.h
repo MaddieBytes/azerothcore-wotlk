@@ -23,6 +23,7 @@
 
 class Player;
 class Unit;
+class Creature;
 
 enum ContentLevels : uint8;
 
@@ -113,6 +114,14 @@ namespace Acore::XP
     }
 
     uint32 BaseGain(uint8 pl_level, uint8 mob_level, ContentLevels content);
+
+    // @tswow-begin: contextual overloads preserve upstream formula signatures for modules
+    uint8 GetGrayLevel(Player* player, uint8 pl_level);
+    XPColorChar GetColorCode(Player* player, Creature* creature, uint8 pl_level, uint8 mob_level);
+    uint8 GetZeroDifference(Player* player, uint8 pl_level);
+    uint32 BaseGain(Player* player, Creature* creature, uint8 pl_level, uint8 mob_level, ContentLevels content);
+    float xp_in_group_rate(Player* player, uint32 count, bool isRaid);
+    // @tswow-end
 
     uint32 Gain(Player* player, Unit* unit, bool isBattleGround = false);
 

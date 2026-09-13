@@ -113,7 +113,9 @@ public:
 
         void JustEngagedWith(Unit* who) override
         {
-            if (!instance->CheckRequiredBosses(DATA_FESTERGUT, who->ToPlayer()))
+            // @tswow-begin: route stock boss access through the generic module hook
+            if (!instance->CheckRequiredBossesWithScripts(DATA_FESTERGUT, who->ToPlayer()))
+            // @tswow-end
             {
                 EnterEvadeMode(EVADE_REASON_OTHER);
                 instance->DoCastSpellOnPlayers(LIGHT_S_HAMMER_TELEPORT);

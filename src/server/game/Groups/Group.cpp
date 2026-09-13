@@ -1659,6 +1659,11 @@ void Group::CountTheRoll(Rolls::iterator rollI)
                         roll->getLoot()->unlootedCount--;
                         AllowedLooterSet looters = item->GetAllowedLooters();
                         Item* _item = player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId, looters);
+                        // @tswow-begin: item taken as loot dispatch
+                        if (_item)
+                            sScriptMgr->OnPlayerLootLifecycle(player, PlayerLootLifecycleEvent::TakenAsLoot,
+                                _item, roll->getLoot(), nullptr, item);
+                        // @tswow-end
                         if (_item)
                             sScriptMgr->OnPlayerGroupRollRewardItem(player, _item, item->count, NEED, roll);
                         player->UpdateLootAchievements(item, roll->getLoot());
@@ -1743,6 +1748,11 @@ void Group::CountTheRoll(Rolls::iterator rollI)
                             roll->getLoot()->unlootedCount--;
                             AllowedLooterSet looters = item->GetAllowedLooters();
                             Item* _item = player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId, looters);
+                            // @tswow-begin: item taken as loot dispatch
+                            if (_item)
+                                sScriptMgr->OnPlayerLootLifecycle(player, PlayerLootLifecycleEvent::TakenAsLoot,
+                                    _item, roll->getLoot(), nullptr, item);
+                            // @tswow-end
                             if (_item)
                                 sScriptMgr->OnPlayerGroupRollRewardItem(player, _item, item->count, GREED, roll);
                             player->UpdateLootAchievements(item, roll->getLoot());

@@ -1778,6 +1778,9 @@ uint32 Map::ApplyDynamicModeRespawnScaling(WorldObject const* obj, uint32 respaw
 
 void Map::DelayedUpdate(const uint32 t_diff)
 {
+    // @tswow-begin: generic delayed map update dispatch
+    sScriptMgr->OnMapDelayedUpdate(this, t_diff);
+    // @tswow-end
     for (_transportsUpdateIter = _transports.begin(); _transportsUpdateIter != _transports.end();)
     {
         Transport* transport = *_transportsUpdateIter;
@@ -2002,6 +2005,9 @@ Map::EnterState InstanceMap::CannotEnter(Player* player, bool loginCheck)
 
     // cannot enter while an encounter is in progress on raids
     bool checkProgress = (IsRaid() || GetId() == 668 /*HoR*/);
+    // @tswow-begin: map encounter-entry notification
+    sScriptMgr->OnMapCheckEncounter(this, player);
+    // @tswow-end
     if (checkProgress && GetInstanceScript() && GetInstanceScript()->IsEncounterInProgress())
     {
         player->SendTransferAborted(GetId(), TRANSFER_ABORT_ZONE_IN_COMBAT);
@@ -2119,7 +2125,12 @@ bool InstanceMap::AddPlayerToMap(Player* player)
     Map::AddPlayerToMap(player);
 
     if (instance_data)
+    {
         instance_data->OnPlayerEnter(player);
+        // @tswow-begin: generic instance lifecycle dispatch
+        sScriptMgr->OnInstanceLifecycle(this, instance_data, InstanceLifecycleEvent::PlayerEnter, player);
+        // @tswow-end
+    }
 
     return true;
 }
@@ -2130,13 +2141,23 @@ void InstanceMap::Update(const uint32 t_diff, const uint32 s_diff, bool /*thread
 
     if (t_diff)
         if (instance_data)
+        {
             instance_data->Update(t_diff);
+            // @tswow-begin: generic instance lifecycle dispatch
+            sScriptMgr->OnInstanceLifecycle(this, instance_data, InstanceLifecycleEvent::Update, nullptr, t_diff);
+            // @tswow-end
+        }
 }
 
 void InstanceMap::RemovePlayerFromMap(Player* player, bool remove)
 {
     if (instance_data)
+    {
         instance_data->OnPlayerLeave(player);
+        // @tswow-begin: generic instance lifecycle dispatch
+        sScriptMgr->OnInstanceLifecycle(this, instance_data, InstanceLifecycleEvent::PlayerLeave, player);
+        // @tswow-end
+    }
     // pussywizard: moved m_unloadTimer to InstanceMap::AfterPlayerUnlinkFromMap(), in this function if 2 players run out at the same time the instance won't close
     //if (!m_unloadTimer && m_mapRefMgr.getSize() == 1)
     //    m_unloadTimer = m_unloadWhenEmpty ? MIN_UNLOAD_DELAY : std::max(sWorld->getIntConfig(CONFIG_INSTANCE_UNLOAD_DELAY), (uint32)MIN_UNLOAD_DELAY);
@@ -2195,6 +2216,13 @@ void InstanceMap::CreateInstanceScript(bool load, std::string data, uint32 compl
         if (data != "")
             instance_data->Load(data.c_str());
     }
+
+    // @tswow-begin: generic instance lifecycle dispatch
+    if (!load)
+        sScriptMgr->OnInstanceLifecycle(this, instance_data, InstanceLifecycleEvent::Create);
+    sScriptMgr->OnInstanceLifecycle(this, instance_data, InstanceLifecycleEvent::Load, nullptr, 0, 0, !load);
+    sScriptMgr->OnInstanceLifecycle(this, instance_data, InstanceLifecycleEvent::Reload);
+    // @tswow-end
 
     instance_data->LoadInstanceSavedGameobjectStateData();
 }

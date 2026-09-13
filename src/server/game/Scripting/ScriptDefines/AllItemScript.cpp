@@ -106,6 +106,15 @@ bool ScriptMgr::OnCastItemCombatSpell(Player* player, Unit* victim, SpellInfo co
     ASSERT(spellInfo);
     ASSERT(item);
 
+    // @tswow-begin: global cancellable item combat-spell hook
+    auto blocked = IsValidBoolScript<AllItemScript>([&](AllItemScript* script)
+    {
+        return !script->CanCastItemCombatSpell(player, victim, spellInfo, item);
+    });
+    if (blocked && *blocked)
+        return false;
+    // @tswow-end
+
     auto tempScript = ScriptRegistry<ItemScript>::GetScriptById(item->GetScriptId());
     return tempScript ? tempScript->OnCastItemCombatSpell(player, victim, spellInfo, item) : true;
 }
@@ -114,6 +123,17 @@ void ScriptMgr::OnGossipSelect(Player* player, Item* item, uint32 sender, uint32
 {
     ASSERT(player);
     ASSERT(item);
+
+    // @tswow-begin: cancellable item gossip hook
+    bool canSelect = true;
+    ExecuteScript<AllItemScript>([&](AllItemScript* script)
+    {
+        if (!script->CanItemGossipSelect(player, item, sender, action))
+            canSelect = false;
+    });
+    if (!canSelect)
+        return;
+    // @tswow-end
 
     ExecuteScript<AllItemScript>([&](AllItemScript* script)
     {
@@ -130,6 +150,17 @@ void ScriptMgr::OnGossipSelectCode(Player* player, Item* item, uint32 sender, ui
 {
     ASSERT(player);
     ASSERT(item);
+
+    // @tswow-begin: cancellable coded item gossip hook
+    bool canSelect = true;
+    ExecuteScript<AllItemScript>([&](AllItemScript* script)
+    {
+        if (!script->CanItemGossipSelectCode(player, item, sender, action, code))
+            canSelect = false;
+    });
+    if (!canSelect)
+        return;
+    // @tswow-end
 
     ExecuteScript<AllItemScript>([&](AllItemScript* script)
     {

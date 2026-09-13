@@ -505,7 +505,14 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover
 
         if (movementInfo.pos.GetPositionZ() < plrMover->GetMap()->GetMinHeight(movementInfo.pos.GetPositionX(), movementInfo.pos.GetPositionY()))
         {
-            if (!plrMover->GetBattleground() || !plrMover->GetBattleground()->HandlePlayerUnderMap(_player))
+            // @tswow-begin: mutable battleground under-map dispatch
+            bool handledByModule = false;
+            if (Battleground* battleground = plrMover->GetBattleground())
+                sScriptMgr->OnBattlegroundLifecycle(battleground,
+                    BattlegroundLifecycleEvent::PlayerUnderMap, _player, nullptr, 0, false, &handledByModule);
+            if (!handledByModule && (!plrMover->GetBattleground() ||
+                !plrMover->GetBattleground()->HandlePlayerUnderMap(_player)))
+            // @tswow-end
             {
                 if (plrMover->IsAlive())
                 {

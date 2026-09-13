@@ -615,6 +615,10 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
         break;
     }
 
+    // @tswow-begin: mutable condition result before negative inversion
+    sScriptMgr->OnConditionEvaluation(this, sourceInfo, condMeets);
+    // @tswow-end
+
     if (NegativeCondition)
         condMeets = !condMeets;
 

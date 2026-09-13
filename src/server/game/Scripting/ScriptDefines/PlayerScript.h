@@ -231,8 +231,83 @@ enum PlayerHook
     PLAYERHOOK_ON_BEFORE_RECEIVE_SPELL_LIST_FROM_TRAINER,
     PLAYERHOOK_ON_GET_TRAINER_SPELL_STATE,
     PLAYERHOOK_ON_AFTER_TRAIN_SPELL,
+    // @tswow-begin: append extension IDs so upstream PlayerHook values stay stable
+    PLAYERHOOK_ON_BEFORE_TALENTS_RESET,
+    PLAYERHOOK_ON_AFTER_TALENTS_RESET,
+    PLAYERHOOK_CAN_LEARN_TALENT_SPELL,
+    PLAYERHOOK_ON_MONEY_LIMIT,
+    PLAYERHOOK_ON_MOVIE_COMPLETE,
+    PLAYERHOOK_CAN_GOSSIP_SELECT,
+    PLAYERHOOK_CAN_GOSSIP_SELECT_CODE,
+    PLAYERHOOK_ON_FLOAT_STAT_CALCULATION,
+    PLAYERHOOK_ON_INT_STAT_CALCULATION,
+    PLAYERHOOK_ON_UINT_STAT_CALCULATION,
+    PLAYERHOOK_ON_MANA_REGEN_CALCULATION,
+    PLAYERHOOK_ON_QUEST_STATUS_CHANGED,
+    PLAYERHOOK_ON_QUEST_OBJECTIVE_PROGRESS,
+    PLAYERHOOK_ON_ITEM_EQUIPPED,
+    PLAYERHOOK_ON_ITEM_LIFECYCLE,
+    PLAYERHOOK_ON_FORMULA_CALCULATION,
+    PLAYERHOOK_ON_LOOT_LIFECYCLE,
+    PLAYERHOOK_ON_TRADE_COMPLETED,
+    // @tswow-end
     PLAYERHOOK_END
 };
+
+// @tswow-begin: generic mutable player stat calculations
+enum class PlayerStatCalculation : uint8
+{
+    Resistance,
+    Armor,
+    AttackPower,
+    RangedAttackPower,
+    BlockPercentage,
+    CritPercentage,
+    ParryPercentage,
+    DodgePercentage,
+    SpellCrit,
+    ArmorPenetration,
+    MeleeHit,
+    RangedHit,
+    SpellHit,
+    Expertise,
+    ShieldBlock,
+    RuneRegen,
+    StaminaHealthBonus,
+    IntellectManaBonus,
+    GlyphSlots
+};
+// @tswow-end
+
+// @tswow-begin: generic player item lifecycle dispatch
+enum class PlayerItemLifecycleEvent : uint8
+{
+    CanChangeEquipState,
+    Bank,
+    CanUse,
+    LFGRollEarly,
+    DestroyEarly
+};
+// @tswow-end
+
+// @tswow-begin: generic mutable player formula dispatch
+enum class PlayerFormulaEvent : uint8
+{
+    GrayLevel,
+    ZeroDifference,
+    GroupGain,
+    SkillGainChance
+};
+// @tswow-end
+
+// @tswow-begin: generic player loot lifecycle dispatch
+enum class PlayerLootLifecycleEvent : uint8
+{
+    GenerateItemLoot,
+    LootCorpse,
+    TakenAsLoot
+};
+// @tswow-end
 
 class PlayerScript : public ScriptObject
 {
@@ -282,6 +357,13 @@ public:
     // Called when a player's talent points are reset (right before the reset is done)
     virtual void OnPlayerTalentsReset(Player* /*player*/, bool /*noCost*/) { }
 
+    // @tswow-begin: exact talent lifecycle hooks
+    virtual void OnPlayerBeforeTalentsReset(Player* /*player*/, bool& /*noCost*/) { }
+    virtual void OnPlayerAfterTalentsReset(Player* /*player*/, bool /*noCost*/) { }
+    [[nodiscard]] virtual bool CanPlayerLearnTalentSpell(Player* /*player*/, TalentEntry const* /*talent*/,
+        uint32 /*rank*/, SpellInfo const* /*spellInfo*/) { return true; }
+    // @tswow-end
+
     // Called when a player attempts to put a point in a talent.
     virtual bool OnPlayerCanLearnTalent(Player* /*player*/, TalentEntry const* /*talent*/, uint32 /*rank*/) { return true; }
 
@@ -294,6 +376,10 @@ public:
 
     // Called when a player's money is modified (before the modification is done)
     virtual void OnPlayerMoneyChanged(Player* /*player*/, int32& /*amount*/) { }
+
+    // @tswow-begin: notify modules when a player reaches a configured money cap
+    virtual void OnPlayerMoneyLimit(Player* /*player*/, int32 /*amount*/) { }
+    // @tswow-end
 
     // Called before looted money is added to a player
     virtual void OnPlayerBeforeLootMoney(Player* /*player*/, Loot* /*loot*/) {}
@@ -375,6 +461,10 @@ public:
     // Called when a player changes to a new map (after moving to new map)
     virtual void OnPlayerMapChanged(Player* /*player*/) { }
 
+    // @tswow-begin: movie completion lifecycle hook
+    virtual void OnPlayerMovieComplete(Player* /*player*/, uint32 /*movieId*/) { }
+    // @tswow-end
+
     // Called before a player is being teleported to new coords
     [[nodiscard]] virtual bool OnPlayerBeforeTeleport(Player* /*player*/, uint32 /*mapid*/, float /*x*/, float /*y*/, float /*z*/, float /*orientation*/, uint32 /*options*/, Unit* /*target*/) { return true; }
 
@@ -414,6 +504,13 @@ public:
     // Called when a player selects an option in a player gossip window
     virtual void OnPlayerGossipSelectCode(Player* /*player*/, uint32 /*menu_id*/, uint32 /*sender*/, uint32 /*action*/, char const* /*code*/) { }
 
+    // @tswow-begin: cancellable player gossip hooks
+    [[nodiscard]] virtual bool CanPlayerGossipSelect(Player* /*player*/, uint32 /*menuId*/, uint32 /*sender*/,
+        uint32 /*action*/) { return true; }
+    [[nodiscard]] virtual bool CanPlayerGossipSelectCode(Player* /*player*/, uint32 /*menuId*/, uint32 /*sender*/,
+        uint32 /*action*/, char const* /*code*/) { return true; }
+    // @tswow-end
+
     // On player getting charmed
     virtual void OnPlayerBeingCharmed(Player* /*player*/, Unit* /*charmer*/, uint32 /*oldFactionId*/, uint32 /*newFactionId*/) { }
 
@@ -428,6 +525,9 @@ public:
 
     // After an item has been equipped
     virtual void OnPlayerEquip(Player* /*player*/, Item* /*it*/, uint8 /*bag*/, uint8 /*slot*/, bool /*update*/) { }
+    // @tswow-begin: item equip completion with merge state
+    virtual void OnPlayerItemEquipped(Player* /*player*/, Item* /*item*/, uint8 /*slot*/, bool /*isMerge*/) { }
+    // @tswow-end
 
     // After an item has been unequipped
     virtual void OnPlayerUnequip(Player* /*player*/, Item* /*it*/) { }
@@ -486,6 +586,17 @@ public:
     virtual void OnPlayerAfterUpdateMaxPower(Player* /*player*/, Powers& /*power*/, float& /*value*/) { }
 
     virtual void OnPlayerAfterUpdateMaxHealth(Player* /*player*/, float& /*value*/) { }
+
+    // @tswow-begin: generic mutable player stat calculations
+    virtual void OnPlayerFloatStatCalculation(Player* /*player*/, PlayerStatCalculation /*type*/,
+        float& /*value*/, float /*argument*/, float /*secondaryArgument*/) { }
+    virtual void OnPlayerIntStatCalculation(Player* /*player*/, PlayerStatCalculation /*type*/,
+        int32& /*value*/, uint32 /*argument*/, Item* /*item*/) { }
+    virtual void OnPlayerUIntStatCalculation(Player* /*player*/, PlayerStatCalculation /*type*/,
+        uint32& /*value*/) { }
+    virtual void OnPlayerManaRegenCalculation(Player* /*player*/, float& /*spiritRegen*/,
+        float& /*flatRegen*/, int32& /*interruptPercent*/) { }
+    // @tswow-end
 
     virtual void OnPlayerBeforeUpdateAttackPowerAndDamage(Player* /*player*/, float& /*level*/, float& /*val2*/, bool /*ranged*/) { }
     virtual void OnPlayerAfterUpdateAttackPowerAndDamage(Player* /*player*/, float& /*level*/, float& /*base_attPower*/, float& /*attPowerMod*/, float& /*attPowerMultiplier*/, bool /*ranged*/) { }
@@ -639,6 +750,12 @@ public:
 
     [[nodiscard]] virtual bool OnPlayerCanInitTrade(Player* /*player*/, Player* /*target*/) { return true; }
 
+    // @tswow-begin: completed player trade notification
+    virtual void OnPlayerTradeCompleted(Player* /*player*/, Player* /*trader*/,
+        Item* const* /*playerItems*/, Item* const* /*traderItems*/, uint8 /*itemCount*/,
+        uint32 /*playerMoney*/, uint32 /*traderMoney*/) { }
+    // @tswow-end
+
     /**
      * @brief This hook called just before finishing the handling of the action of a player setting an item in a trade slot
      *
@@ -762,6 +879,12 @@ public:
      * @param quest Contains information about the Quest
      */
     virtual void OnPlayerQuestAccept(Player* /*player*/, Quest const* /*quest*/) { }
+
+    // @tswow-begin: generic quest state notifications
+    virtual void OnPlayerQuestStatusChanged(Player* /*player*/, Quest const* /*quest*/) { }
+    virtual void OnPlayerQuestObjectiveProgress(Player* /*player*/, Quest const* /*quest*/,
+        uint32 /*objectiveIndex*/, uint16 /*progress*/) { }
+    // @tswow-end
 
     /**
      * @brief This hook called before other CanFlyChecks are applied
@@ -946,6 +1069,24 @@ public:
      * @param spellId The id of the trainer spell that was bought
      */
     virtual void OnPlayerAfterTrainSpell(Player* /*player*/, Creature* /*trainer*/, uint32 /*spellId*/) {}
+    // @tswow-begin: generic player item lifecycle dispatch
+    virtual void OnPlayerItemLifecycle(Player* /*player*/, PlayerItemLifecycleEvent /*type*/,
+        Item* /*item*/ = nullptr, ItemTemplate const* /*itemTemplate*/ = nullptr,
+        WorldObject* /*lootedObject*/ = nullptr, uint8 /*bag*/ = 0, uint8 /*slot*/ = 0,
+        bool /*flag*/ = false, uint32* /*result*/ = nullptr, int32* /*signedResult*/ = nullptr,
+        bool* /*boolResult*/ = nullptr) { }
+    // @tswow-end
+    // @tswow-begin: generic mutable player formula dispatch
+    virtual void OnPlayerFormulaCalculation(Player* /*player*/, PlayerFormulaEvent /*type*/,
+        uint8* /*byteValue*/ = nullptr, float* /*floatValue*/ = nullptr, int32* /*intValue*/ = nullptr,
+        uint32 /*argument1*/ = 0, uint32 /*argument2*/ = 0, uint32 /*argument3*/ = 0,
+        uint32 /*argument4*/ = 0, uint32 /*argument5*/ = 0, bool /*flag*/ = false) { }
+    // @tswow-end
+    // @tswow-begin: generic player loot lifecycle dispatch
+    virtual void OnPlayerLootLifecycle(Player* /*player*/, PlayerLootLifecycleEvent /*type*/,
+        Item* /*item*/ = nullptr, Loot* /*loot*/ = nullptr, WorldObject* /*source*/ = nullptr,
+        LootItem* /*lootItem*/ = nullptr, uint32 /*lootType*/ = 0) { }
+    // @tswow-end
 };
 
 #endif

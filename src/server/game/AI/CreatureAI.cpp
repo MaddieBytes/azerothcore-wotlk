@@ -32,6 +32,15 @@
 #include "ZoneScript.h"
 #include <functional>
 
+// @tswow-begin: generic movement completion lifecycle dispatch
+void CreatureAI::NotifyMovementInform(uint32 type, uint32 id)
+{
+    sScriptMgr->OnCreatureLifecycle(me, CreatureLifecycleEvent::MovementInform,
+        nullptr, nullptr, type, id);
+    MovementInform(type, id);
+}
+// @tswow-end
+
 //Disable CreatureAI when charmed
 void CreatureAI::OnCharmed(bool /* apply */)
 {

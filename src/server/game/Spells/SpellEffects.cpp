@@ -2800,6 +2800,10 @@ void Spell::EffectDispel(SpellEffIndex effIndex)
     if (success_list.empty())
         return;
 
+    // @tswow-begin: successful spell dispel lifecycle dispatch
+    sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::SuccessfulDispel, effIndex);
+    // @tswow-end
+
     WorldPacket dataSuccess(SMSG_SPELLDISPELLOG, 8 + 8 + 4 + 1 + 4 + success_list.size() * 5);
     // Send packet header
     dataSuccess << unitTarget->GetPackGUID();               // Victim GUID
@@ -4560,7 +4564,12 @@ void Spell::EffectApplyGlyph(SpellEffIndex effIndex)
             minLevel = 80;
             break;
     }
-    if (minLevel && unitCaster->GetLevel() < minLevel)
+    bool isLocked = minLevel && unitCaster->GetLevel() < minLevel;
+    // @tswow-begin: mutable glyph application check
+    sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::EffectApplyGlyph, 0, player, nullptr,
+        &isLocked);
+    // @tswow-end
+    if (isLocked)
     {
         SendCastResult(SPELL_FAILED_GLYPH_SOCKET_LOCKED);
         return;
@@ -4996,6 +5005,9 @@ void Spell::EffectQuestComplete(SpellEffIndex effIndex)
         if (!quest)
             return;
 
+        // @tswow-begin: spell-driven quest completion notification
+        sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::QuestFinish, 0, player, quest);
+        // @tswow-end
         uint16 logSlot = player->FindQuestSlot(questId);
         if (logSlot < MAX_QUEST_LOG_SIZE)
             player->AreaExploredOrEventHappens(questId);

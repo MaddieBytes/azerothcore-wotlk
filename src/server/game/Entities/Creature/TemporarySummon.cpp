@@ -261,6 +261,9 @@ void TempSummon::InitSummon()
     {
         if (owner->IsCreature())
         {
+            // @tswow-begin: generic creature AI lifecycle dispatch
+            sScriptMgr->OnCreatureLifecycle(owner->ToCreature(), CreatureLifecycleEvent::Summoned, this);
+            // @tswow-end
             if (owner->ToCreature()->IsAIEnabled)
             {
                 owner->ToCreature()->AI()->JustSummoned(this);
@@ -274,6 +277,9 @@ void TempSummon::InitSummon()
             }
         }
 
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::IsSummoned, owner);
+        // @tswow-end
         if (IsAIEnabled)
             AI()->IsSummonedBy(owner);
     }
@@ -311,8 +317,16 @@ void TempSummon::UnSummon(Milliseconds msTime)
         return;
     }
 
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::Despawn, GetSummoner());
+    // @tswow-end
+
     if (WorldObject* owner = GetSummoner())
     {
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        if (Creature* creature = owner->ToCreature())
+            sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::SummonDespawn, this);
+        // @tswow-end
         if (owner->IsCreature() && owner->ToCreature()->IsAIEnabled)
             owner->ToCreature()->AI()->SummonedCreatureDespawn(this);
         else if (owner->IsGameObject() && owner->ToGameObject()->AI())

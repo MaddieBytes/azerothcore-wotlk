@@ -690,7 +690,9 @@ void BossAI::_JustEngagedWith()
     if (instance)
     {
         // bosses do not respawn, check only on enter combat
-        if (!instance->CheckRequiredBosses(_bossId))
+        // @tswow-begin: route stock boss access through the generic module hook
+        if (!instance->CheckRequiredBossesWithScripts(_bossId))
+        // @tswow-end
         {
             EnterEvadeMode();
             return;

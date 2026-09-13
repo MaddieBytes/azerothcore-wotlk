@@ -508,7 +508,9 @@ public:
             if (IsEngaged())
                 return;
 
-            if (!instance->CheckRequiredBosses(DATA_VALITHRIA_DREAMWALKER, target->ToPlayer()))
+            // @tswow-begin: route stock boss access through the generic module hook
+            if (!instance->CheckRequiredBossesWithScripts(DATA_VALITHRIA_DREAMWALKER, target->ToPlayer()))
+            // @tswow-end
             {
                 EnterEvadeMode(EVADE_REASON_SEQUENCE_BREAK);
                 instance->DoCastSpellOnPlayers(LIGHT_S_HAMMER_TELEPORT);

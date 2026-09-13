@@ -44,6 +44,25 @@ enum AllBattlegroundHook
     ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_SETUP,
     ALLBATTLEGROUNDHOOK_CAN_ADD_GROUP_TO_MATCHING_POOL,
     ALLBATTLEGROUNDHOOK_GET_PLAYER_MATCHMAKING_RATING,
+    // @tswow-begin: generic battleground lifecycle dispatch
+    ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_LIFECYCLE,
+    // @tswow-end
+    // @tswow-begin: mutable battleground score serialization hook
+    ALLBATTLEGROUNDHOOK_CAN_APPEND_BATTLEGROUND_SCORE,
+    // @tswow-end
+    // @tswow-begin: mutable battleground spawn dispatch
+    ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_SPAWN,
+    // @tswow-begin: mutable battleground type selection
+    ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_TYPE_SELECTION,
+    // @tswow-end
+    // @tswow-begin: battleground objective action dispatch
+    ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_ACTION,
+    // @tswow-end
+    // @tswow-begin: battleground criteria and generic-event dispatch
+    ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_ACHIEVEMENT_CRITERIA,
+    ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_GENERIC_EVENT,
+    // @tswow-end
+    // @tswow-end
     ALLBATTLEGROUNDHOOK_END
 };
 
@@ -51,8 +70,45 @@ enum BattlegroundBracketId : uint8;
 enum BattlegroundTypeId : uint8;
 enum TeamId : uint8;
 
+// @tswow-begin: generic battleground lifecycle dispatch
+enum class BattlegroundLifecycleEvent : uint8
+{
+    CanCreate,
+    Reload,
+    UpdateEarly,
+    EndEarly,
+    Reset,
+    UpdateScore,
+    CloseDoors,
+    PlayerUnderMap,
+    AreaTrigger
+};
+// @tswow-end
+
+// @tswow-begin: mutable battleground spawn dispatch
+enum class BattlegroundSpawnEvent : uint8
+{
+    GameObject,
+    Creature,
+    SpiritGuide
+};
+// @tswow-end
+
+// @tswow-begin: battleground objective action dispatch
+enum class BattlegroundActionEvent : uint8
+{
+    ClickFlag,
+    DropFlag,
+    DestroyGate
+};
+// @tswow-end
+
 class BattlegroundQueue;
 struct GroupQueueInfo;
+// @tswow-begin: mutable battleground score serialization hook
+struct BattlegroundScore;
+class WorldPacket;
+// @tswow-end
 
 class AllBattlegroundScript : public ScriptObject
 {
@@ -174,6 +230,38 @@ public:
      * @return True if rating was provided, false otherwise
      */
     [[nodiscard]] virtual bool GetPlayerMatchmakingRating(ObjectGuid /*playerGuid*/, BattlegroundTypeId /*bgTypeId*/, float& /*outRating*/) { return false; }
+
+    // @tswow-begin: generic battleground lifecycle dispatch
+    virtual void OnBattlegroundLifecycle(Battleground* /*bg*/, BattlegroundLifecycleEvent /*type*/,
+        Player* /*player*/ = nullptr, uint32* /*value*/ = nullptr, uint32 /*secondaryValue*/ = 0,
+        bool /*flag*/ = false, bool* /*result*/ = nullptr) { }
+    // @tswow-end
+
+    // @tswow-begin: mutable battleground spawn dispatch
+    virtual void OnBattlegroundSpawn(Battleground* /*bg*/, BattlegroundSpawnEvent /*type*/, uint32 /*slot*/,
+        uint32& /*entry*/, uint8* /*stateOrTeam*/, float& /*x*/, float& /*y*/, float& /*z*/, float& /*o*/,
+        float* /*rotation0*/ = nullptr, float* /*rotation1*/ = nullptr, float* /*rotation2*/ = nullptr,
+        float* /*rotation3*/ = nullptr, uint32* /*respawnTime*/ = nullptr) { }
+    // @tswow-end
+
+    // @tswow-begin: mutable battleground score serialization hook
+    [[nodiscard]] virtual bool CanAppendBattlegroundScore(Battleground* /*bg*/, BattlegroundScore* /*score*/,
+        WorldPacket& /*packet*/) { return true; }
+    // @tswow-end
+    // @tswow-begin: mutable battleground type selection
+    virtual void OnBattlegroundTypeSelection(uint32 /*candidateType*/, float* /*weight*/ = nullptr,
+        uint32 /*originalType*/ = 0, uint32* /*selectedType*/ = nullptr) { }
+    // @tswow-end
+    // @tswow-begin: battleground objective action dispatch
+    virtual void OnBattlegroundAction(Battleground* /*bg*/, BattlegroundActionEvent /*type*/,
+        Player* /*player*/, GameObject* /*target*/ = nullptr) { }
+    // @tswow-end
+    // @tswow-begin: battleground criteria and generic-event dispatch
+    virtual void OnBattlegroundAchievementCriteria(Battleground* /*bg*/, uint32 /*criteriaId*/,
+        Player* /*source*/, Unit* /*target*/, uint32 /*miscValue*/, bool& /*handled*/) { }
+    virtual void OnBattlegroundGenericEvent(Battleground* /*bg*/, WorldObject* /*object*/,
+        uint32 /*eventId*/, WorldObject* /*invoker*/) { }
+    // @tswow-end
 };
 
 // Compatibility for old scripts

@@ -169,5 +169,7 @@ void FormationMovementGenerator::LaunchMovement(Creature* owner, Unit* target)
 void FormationMovementGenerator::MovementInform(Creature* owner)
 {
     if (owner->AI())
-        owner->AI()->MovementInform(FORMATION_MOTION_TYPE, 0);
+        // @tswow-begin: route movement completion through generic lifecycle dispatch
+        owner->AI()->NotifyMovementInform(FORMATION_MOTION_TYPE, 0);
+        // @tswow-end
 }

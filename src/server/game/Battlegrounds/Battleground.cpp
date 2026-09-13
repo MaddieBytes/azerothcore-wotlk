@@ -126,6 +126,14 @@ void Battleground::BroadcastWorker(Do& _do)
 
 void BattlegroundScore::AppendToPacket(WorldPacket& data)
 {
+    // @tswow-begin: reusable base battleground score serialization
+    AppendBaseToPacket(data);
+    BuildObjectivesBlock(data);
+}
+
+void BattlegroundScore::AppendBaseToPacket(WorldPacket& data) const
+{
+    // @tswow-end
     data << PlayerGuid;
 
     data << uint32(KillingBlows);
@@ -135,7 +143,6 @@ void BattlegroundScore::AppendToPacket(WorldPacket& data)
     data << uint32(DamageDone);
     data << uint32(HealingDone);
 
-    BuildObjectivesBlock(data);
 }
 
 Battleground::Battleground()
@@ -260,6 +267,10 @@ void Battleground::Update(uint32 diff)
 
     diff = BATTLEGROUND_UPDATE_INTERVAL; // just change diff value, no need to replace variable name in many places
     m_UpdateTimer -= BATTLEGROUND_UPDATE_INTERVAL;
+
+    // @tswow-begin: generic battleground lifecycle dispatch
+    sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::UpdateEarly, nullptr, &diff);
+    // @tswow-end
 
     if (!PreUpdateImpl(diff))
         return;
@@ -500,14 +511,24 @@ inline void Battleground::_ProcessJoin(uint32 diff)
             return;
         }
 
+        // @tswow-begin: generic battleground lifecycle dispatch
+        sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::Reload);
+        bool canCreate = true;
+        sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::CanCreate, nullptr, nullptr,
+            0, false, &canCreate);
+        // @tswow-end
+
         // Setup here, only when at least one player has ported to the map
-        if (!SetupBattleground())
+        if (!canCreate || !SetupBattleground())
         {
             EndNow();
             return;
         }
 
         StartingEventCloseDoors();
+        // @tswow-begin: generic battleground lifecycle dispatch
+        sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::CloseDoors);
+        // @tswow-end
 
         // Get the configured prep time
         uint32 configuredPrepTime;
@@ -825,6 +846,12 @@ void Battleground::EndBattleground(PvPTeamId winnerTeamId)
     // set as fast as possible
     if (GetStatus() == STATUS_WAIT_LEAVE)
         return;
+
+    // @tswow-begin: generic battleground lifecycle dispatch
+    uint32 mutableWinner = static_cast<uint32>(winnerTeamId);
+    sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::EndEarly, nullptr, &mutableWinner);
+    winnerTeamId = static_cast<PvPTeamId>(mutableWinner);
+    // @tswow-end
 
     RemoveFromBGFreeSlotQueue();
     SetStatus(STATUS_WAIT_LEAVE);
@@ -1163,6 +1190,10 @@ void Battleground::Init()
     for (auto& itr : _arenaTeamScores)
         itr.Reset();
 
+    // @tswow-begin: generic battleground lifecycle dispatch
+    sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::Reset);
+    // @tswow-end
+
     ResetBGSubclass();
 }
 
@@ -1397,7 +1428,13 @@ void Battleground::BuildPvPLogDataPacket(WorldPacket& data)
     data << uint32(GetPlayerScores()->size());
 
     for (auto const& score : PlayerScores)
+    {
+        // @tswow-begin: mutable battleground score serialization hook
+        if (!sScriptMgr->CanAppendBattlegroundScore(this, score.second, data))
+            continue;
+        // @tswow-end
         score.second->AppendToPacket(data);
+    }
 }
 
 bool Battleground::UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor)
@@ -1405,6 +1442,11 @@ bool Battleground::UpdatePlayerScore(Player* player, uint32 type, uint32 value, 
     auto const& itr = PlayerScores.find(player->GetGUID().GetCounter());
     if (itr == PlayerScores.end()) // player not found...
         return false;
+
+    // @tswow-begin: generic battleground lifecycle dispatch
+    sScriptMgr->OnBattlegroundLifecycle(this, BattlegroundLifecycleEvent::UpdateScore, player, &value,
+        type, doAddHonor);
+    // @tswow-end
 
     if (type == SCORE_BONUS_HONOR && doAddHonor && isBattleground())
         player->RewardHonor(nullptr, 1, value); // RewardHonor calls UpdatePlayerScore with doAddHonor = false
@@ -1465,6 +1507,13 @@ bool Battleground::AddObject(uint32 type, uint32 entry, float x, float y, float 
 {
     // If the assert is called, means that BgObjects must be resized!
     ASSERT(type < BgObjects.size());
+
+    // @tswow-begin: mutable battleground game-object spawn dispatch
+    uint8 mutableState = static_cast<uint8>(goState);
+    sScriptMgr->OnBattlegroundSpawn(this, BattlegroundSpawnEvent::GameObject, type, entry,
+        &mutableState, x, y, z, o, &rotation0, &rotation1, &rotation2, &rotation3);
+    goState = static_cast<GOState>(mutableState);
+    // @tswow-end
 
     Map* map = FindBgMap();
     if (!map)
@@ -1588,6 +1637,11 @@ Creature* Battleground::AddCreature(uint32 entry, uint32 type, float x, float y,
     // If the assert is called, means that BgCreatures must be resized!
     ASSERT(type < BgCreatures.size());
 
+    // @tswow-begin: mutable battleground creature spawn dispatch
+    sScriptMgr->OnBattlegroundSpawn(this, BattlegroundSpawnEvent::Creature, type, entry,
+        nullptr, x, y, z, o, nullptr, nullptr, nullptr, nullptr, &respawntime);
+    // @tswow-end
+
     Map* map = FindBgMap();
     if (!map)
         return nullptr;
@@ -1688,6 +1742,13 @@ bool Battleground::DelObject(uint32 type)
 bool Battleground::AddSpiritGuide(uint32 type, float x, float y, float z, float o, TeamId teamId)
 {
     uint32 entry = (teamId == TEAM_ALLIANCE) ? BG_CREATURE_ENTRY_A_SPIRITGUIDE : BG_CREATURE_ENTRY_H_SPIRITGUIDE;
+
+    // @tswow-begin: mutable battleground spirit-guide spawn dispatch
+    uint8 mutableTeam = static_cast<uint8>(teamId);
+    sScriptMgr->OnBattlegroundSpawn(this, BattlegroundSpawnEvent::SpiritGuide, type, entry,
+        &mutableTeam, x, y, z, o);
+    teamId = static_cast<TeamId>(mutableTeam);
+    // @tswow-end
 
     if (Creature* creature = AddCreature(entry, type, x, y, z, o))
     {

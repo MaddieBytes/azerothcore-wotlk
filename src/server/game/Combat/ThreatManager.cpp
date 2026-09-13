@@ -32,6 +32,7 @@
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
+#include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
@@ -423,9 +424,19 @@ void ThreatManager::AddThreat(Unit* target, float amount, SpellInfo const* spell
         return;
     }
 
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    sScriptMgr->OnUnitLifecycle(const_cast<Unit*>(_owner), UnitLifecycleEvent::CalcThreatEarly, target,
+        spell, nullptr, &amount, nullptr, nullptr, 0, 0, 0, 0, ignoreModifiers);
+    // @tswow-end
+
     // apply threat modifiers to the amount
     if (!ignoreModifiers)
         amount = CalculateModifiedThreat(amount, target, spell);
+
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    sScriptMgr->OnUnitLifecycle(const_cast<Unit*>(_owner), UnitLifecycleEvent::CalcThreatLate, target,
+        spell, nullptr, &amount, nullptr, nullptr, 0, 0, 0, 0, ignoreModifiers);
+    // @tswow-end
 
     // if we're increasing threat, send some/all of it to redirection targets instead if applicable
     if (!ignoreRedirects && amount > 0.0f)
@@ -498,6 +509,10 @@ void ThreatManager::AddThreat(Unit* target, float amount, SpellInfo const* spell
 
 void ThreatManager::ScaleThreat(Unit* target, float factor)
 {
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    sScriptMgr->OnUnitLifecycle(const_cast<Unit*>(_owner), UnitLifecycleEvent::CalcScaleThreat, target,
+        nullptr, nullptr, &factor);
+    // @tswow-end
     auto it = _myThreatListEntries.find(target->GetGUID());
     if (it != _myThreatListEntries.end())
         it->second->ScaleThreat(std::max<float>(factor, 0.0f));

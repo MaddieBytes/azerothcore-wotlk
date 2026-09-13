@@ -23,11 +23,17 @@
 #include "AchievementScript.h"
 #include "AllBattlegroundScript.h"
 #include "AllCommandScript.h"
+// @tswow-begin: global mutable condition evaluation interface
+#include "AllConditionScript.h"
+// @tswow-end
 #include "AllCreatureScript.h"
 #include "AllGameObjectScript.h"
 #include "AllItemScript.h"
 #include "AllMapScript.h"
 #include "AllSpellScript.h"
+// @tswow-begin: generic SmartAI action lifecycle interface
+#include "AllSmartScript.h"
+// @tswow-end
 #include "AreaTriggerScript.h"
 #include "ArenaScript.h"
 #include "ArenaTeamScript.h"

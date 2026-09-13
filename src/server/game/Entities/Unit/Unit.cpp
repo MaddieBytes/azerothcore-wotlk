@@ -1001,10 +1001,15 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
     // Signal to pets that their owner was attacked - except when DOT.
     if (attacker != victim && damagetype != DOT)
     {
+        // @tswow-begin: generic creature AI lifecycle dispatch
         for (Unit* controlled : victim->m_Controlled)
             if (Creature* cControlled = controlled->ToCreature())
+            {
+                sScriptMgr->OnCreatureLifecycle(cControlled, CreatureLifecycleEvent::OwnerAttacked, attacker);
                 if (CreatureAI* controlledAI = cControlled->AI())
                     controlledAI->OwnerAttackedBy(attacker);
+            }
+        // @tswow-end
     }
 
     //Dont deal damage to unit if .cheat god is enable.
@@ -1489,7 +1494,11 @@ SpellCastResult Unit::CastSpell(GameObject* go, uint32 spellId, bool triggered, 
     return CastSpell(targets, spellInfo, nullptr, triggered ? TRIGGERED_FULL_MASK : TRIGGERED_NONE, castItem, triggeredByAura, originalCaster);
 }
 
-void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 damage, SpellInfo const* spellInfo, WeaponAttackType attackType, bool crit)
+// @tswow-begin: retain active spell context for generic damage lifecycle hooks
+void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 damage,
+    SpellInfo const* spellInfo, WeaponAttackType attackType, bool crit, Spell* spell,
+    uint32 effectMask)
+// @tswow-end
 {
     if (damage < 0)
         return;
@@ -1497,6 +1506,12 @@ void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 dama
     Unit* victim = damageInfo->target;
     if (!victim || !victim->IsAlive())
         return;
+
+    // @tswow-begin: mutable spell damage before mitigation
+    if (spell)
+        sScriptMgr->OnSpellDamage(spell, SpellDamagePhase::Early, damageInfo, &damage, nullptr,
+            static_cast<uint8>(attackType), crit, effectMask);
+    // @tswow-end
 
     SpellSchoolMask damageSchoolMask = SpellSchoolMask(damageInfo->schoolMask);
     uint32 crTypeMask = victim->GetCreatureTypeMask();
@@ -1629,11 +1644,19 @@ void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 dama
     if (damageInfo->damage > 0)
     {
         DamageInfo dmgInfo(*damageInfo, SPELL_DIRECT_DAMAGE, BASE_ATTACK, 0);
-        Unit::CalcAbsorbResist(dmgInfo);
+        // @tswow-begin: retain active spell context for resistance and absorption hooks
+        Unit::CalcAbsorbResist(dmgInfo, false, 0, spell);
+        // @tswow-end
         damageInfo->absorb = dmgInfo.GetAbsorb();
         damageInfo->resist = dmgInfo.GetResist();
         damageInfo->damage = dmgInfo.GetDamage();
     }
+
+    // @tswow-begin: mutable spell damage after mitigation
+    if (spell)
+        sScriptMgr->OnSpellDamage(spell, SpellDamagePhase::Late, damageInfo, nullptr,
+            &damageInfo->damage, static_cast<uint8>(attackType), crit, effectMask);
+    // @tswow-end
 }
 
 void Unit::DealSpellDamage(SpellNonMeleeDamage* damageInfo, bool durabilityLoss, Spell const* spell /*= nullptr*/)
@@ -1759,6 +1782,11 @@ void Unit::CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, Weapon
 
         // Script Hook For CalculateMeleeDamage -- Allow scripts to change the Damage pre class mitigation calculations
         sScriptMgr->ModifyMeleeDamage(damageInfo->target, damageInfo->attacker, damage);
+
+        // @tswow-begin: generic unit calculation and lifecycle dispatch
+        sScriptMgr->OnUnitLifecycle(this, UnitLifecycleEvent::MeleeDamageEarly, victim, nullptr,
+            damageInfo, nullptr, &damage, nullptr, 0, 0, damageInfo->attackType, i);
+        // @tswow-end
 
         if (victim->GetAI())
         {
@@ -1979,6 +2007,12 @@ void Unit::CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, Weapon
 
             damageInfo->damages[i].damage = dmgInfo.GetDamage();
         }
+
+        // @tswow-begin: generic unit calculation and lifecycle dispatch
+        sScriptMgr->OnUnitLifecycle(this, UnitLifecycleEvent::MeleeDamageLate, victim, nullptr,
+            damageInfo, nullptr, &damageInfo->damages[i].damage, nullptr, 0, 0,
+            damageInfo->attackType, i);
+        // @tswow-end
     }
 
     // set proper HitInfo flags
@@ -2324,7 +2358,9 @@ float Unit::GetEffectiveResistChance(Unit const* owner, SpellSchoolMask schoolMa
     return std::min(victimResistance / (victimResistance + resistanceConstant), 0.75f);
 }
 
-void Unit::CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited, uint8 casterLevel /*= 0*/)
+// @tswow-begin: retain active spell context for resistance and absorption hooks
+void Unit::CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited, uint8 casterLevel, Spell* spell)
+// @tswow-end
 {
     Unit* victim = dmgInfo.GetVictim();
     Unit* attacker = dmgInfo.GetAttacker();
@@ -2334,6 +2370,10 @@ void Unit::CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited, uint8 casterLevel
 
     if (!victim || !victim->IsAlive() || !damage)
         return;
+
+    // @tswow-begin: hold resistance until the active spell hook can mutate it
+    uint32 resistedDamage = 0;
+    // @tswow-end
 
     // Magic damage, check for resists
     // Ignore spells that cant be resisted
@@ -2393,7 +2433,10 @@ void Unit::CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited, uint8 casterLevel
             }
         }
 
-        dmgInfo.ResistDamage(uint32(damageResisted));
+        // @tswow-begin: delay resistance application until the spell hook can mutate it
+        damageResisted = std::max(damageResisted, 0.0f);
+        resistedDamage = static_cast<uint32>(damageResisted);
+        // @tswow-end
     }
 
     // Ignore Absorption Auras
@@ -2413,6 +2456,16 @@ void Unit::CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited, uint8 casterLevel
         })));
         RoundToInterval(auraAbsorbMod, 0.0f, 100.0f);
     }
+
+    // @tswow-begin: mutable spell resistance and absorption dispatch
+    int32 absorbIgnoringDamage = spell ? CalculatePct(dmgInfo.GetDamage(), auraAbsorbMod) : 0;
+    if (spell)
+        (void)sScriptMgr->CanCalculateSpellResistAbsorb(spell, dmgInfo, resistedDamage,
+            absorbIgnoringDamage);
+    dmgInfo.ResistDamage(resistedDamage);
+    if (absorbIgnoringDamage > 0)
+        dmgInfo.ModifyDamage(-absorbIgnoringDamage);
+    // @tswow-end
 
     // We're going to call functions which can modify content of the list during iteration over it's elements
     // Let's copy the list so we can prevent iterator invalidation
@@ -2450,7 +2503,10 @@ void Unit::CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited, uint8 casterLevel
         currentAbsorb = RoundToInterval(currentAbsorb, 0, int32(dmgInfo.GetDamage()));
 
         // xinef: do this after absorb is rounded to damage...
-        AddPct(currentAbsorb, -auraAbsorbMod);
+        // @tswow-begin: active spells apply ignored absorption before shield processing
+        if (!spell)
+            AddPct(currentAbsorb, -auraAbsorbMod);
+        // @tswow-end
 
         dmgInfo.AbsorbDamage(currentAbsorb);
 
@@ -3221,7 +3277,12 @@ float Unit::CalculateLevelPenalty(SpellInfo const* spellProto) const
     if (LvlFactor > 1.0f)
         LvlFactor = 1.0f;
 
-    return AddPct(LvlFactor, -LvlPenalty);
+    float result = AddPct(LvlFactor, -LvlPenalty);
+    // @tswow-begin: mutable spell power level penalty
+    sScriptMgr->OnSpellCalculation(spellProto, SpellCalculationEvent::SpellPowerLevelPenalty,
+        const_cast<Unit*>(this), nullptr, nullptr, &result);
+    // @tswow-end
+    return result;
 }
 
 void Unit::SendMeleeAttackStart(Unit* victim, Player* sendTo)
@@ -3356,7 +3417,6 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit* victim, SpellInfo const* spellInfo
 
     // Chance resist mechanic
     int32 resist_chance = victim->GetMechanicResistChance(spellInfo) * 100;
-    tmp += resist_chance;
     if (roll < tmp)
         return SPELL_MISS_RESIST;
 
@@ -3561,6 +3621,11 @@ float Unit::GetUnitMissChance(WeaponAttackType attType) const
     else
         miss_chance -= GetTotalAuraModifier(SPELL_AURA_MOD_ATTACKER_MELEE_HIT_CHANCE);
 
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    sScriptMgr->OnUnitLifecycle(const_cast<Unit*>(this), UnitLifecycleEvent::CalcMissChance, nullptr,
+        nullptr, nullptr, &miss_chance);
+    // @tswow-end
+
     return miss_chance;
 }
 
@@ -3642,6 +3707,11 @@ float Unit::GetUnitCriticalChance(WeaponAttackType attackType, Unit const* victi
 
     // xinef: SPELL_AURA_MOD_ATTACKER_SPELL_AND_WEAPON_CRIT_CHANCE should be calculated at the end
     crit += victim->GetTotalAuraModifier(SPELL_AURA_MOD_ATTACKER_SPELL_AND_WEAPON_CRIT_CHANCE);
+
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    sScriptMgr->OnUnitLifecycle(const_cast<Unit*>(this), UnitLifecycleEvent::CalcMeleeCrit,
+        const_cast<Unit*>(victim), nullptr, nullptr, &crit, nullptr, nullptr, 0, 0, attackType);
+    // @tswow-end
 
     if (crit < 0.0f)
         crit = 0.0f;
@@ -3972,6 +4042,12 @@ void Unit::InterruptSpell(CurrentSpellTypes spellType, bool withDelayed, bool wi
             m_currentSpells[spellType] = nullptr;
             spell->SetReferencedFromCurrent(false);
         }
+
+        // @tswow-begin: generic creature spell-finished lifecycle dispatch
+        if (Creature* creature = ToCreature())
+            sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::SpellCastFinished,
+                nullptr, nullptr, 1, 0, false, spell->GetSpellInfo());
+        // @tswow-end
 
         if (IsCreature() && IsAIEnabled)
             ToCreature()->AI()->OnSpellFailed(spell->GetSpellInfo());
@@ -7180,10 +7256,15 @@ bool Unit::Attack(Unit* victim, bool meleeAttack)
     // Spells such as auto-shot and others handled in WorldSession::HandleCastSpellOpcode
     if (IsPlayer())
     {
+        // @tswow-begin: generic creature AI lifecycle dispatch
         for (Unit* controlled : m_Controlled)
             if (Creature* cControlled = controlled->ToCreature())
+            {
+                sScriptMgr->OnCreatureLifecycle(cControlled, CreatureLifecycleEvent::OwnerAttacks, victim);
                 if (CreatureAI* controlledAI = cControlled->AI())
                     controlledAI->OwnerAttacked(victim);
+            }
+        // @tswow-end
     }
 
     return true;
@@ -13618,6 +13699,10 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
             if (creature->GetLootMode())
                 loot->generateMoneyLoot(creature->GetCreatureTemplate()->mingold, creature->GetCreatureTemplate()->maxgold);
 
+            // @tswow-begin: generic creature AI lifecycle dispatch
+            sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::GenerateLoot, player);
+            // @tswow-end
+
             if (group)
             {
                 if (hasLooterGuid)
@@ -13633,6 +13718,10 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
 
         player->RewardPlayerAndGroupAtKill(victim, false);
     }
+
+    // @tswow-begin: early unit death lifecycle hook
+    sScriptMgr->OnUnitDeathEarly(victim, killer);
+    // @tswow-end
 
     // Do KILL and KILLED procs. KILL proc is called only for the unit who landed the killing blow (and its owner - for pets and totems) regardless of who tapped the victim
     // Spell context is not passed to avoid the killing spell's triggered status from suppressing nested proc events
@@ -13730,6 +13819,10 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
             plrVictim->SendDurabilityLoss();
         }
         // Call KilledUnit for creatures
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        if (killer && killer->IsCreature())
+            sScriptMgr->OnCreatureLifecycle(killer->ToCreature(), CreatureLifecycleEvent::KilledUnit, victim);
+        // @tswow-end
         if (killer && killer->IsCreature() && killer->IsAIEnabled)
             killer->ToCreature()->AI()->KilledUnit(victim);
 
@@ -13772,6 +13865,11 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
         {
             if (WorldObject* summoner = summon->GetSummoner())
             {
+                // @tswow-begin: generic creature AI lifecycle dispatch
+                if (Creature* summonerCreature = summoner->ToCreature())
+                    sScriptMgr->OnCreatureLifecycle(summonerCreature, CreatureLifecycleEvent::SummonDies,
+                        creature, killer);
+                // @tswow-end
                 if (summoner->ToCreature() && summoner->ToCreature()->IsAIEnabled)
                 {
                     summoner->ToCreature()->AI()->SummonedCreatureDies(creature, killer);
@@ -14265,6 +14363,10 @@ bool Unit::SetCharmedBy(Unit* charmer, CharmType type, AuraApplication const* au
         }
         else
         {
+            // @tswow-begin: generic creature AI lifecycle dispatch
+            sScriptMgr->OnCreatureLifecycle(ToCreature(), CreatureLifecycleEvent::Charmed, nullptr, nullptr,
+                0, 0, true);
+            // @tswow-end
             ToCreature()->AI()->OnCharmed(true);
         }
 
@@ -14491,6 +14593,9 @@ void Unit::RemoveCharmedBy(Unit* charmer)
                 GetMotionMaster()->MoveChase(charmer);
 
         // Creature will restore its old AI on next update
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::Charmed, nullptr, nullptr, 0, 0, false);
+        // @tswow-end
         if (creature->AI())
             creature->AI()->OnCharmed(false);
 
@@ -14852,6 +14957,13 @@ float Unit::MeleeSpellMissChance(Unit const* victim, WeaponAttackType attType, i
     else
         missChance -= m_modMeleeHitChance;
 
+    // @tswow-begin: mutable melee spell miss chance
+    if (spellInfo)
+        sScriptMgr->OnSpellCalculation(spellInfo, SpellCalculationEvent::MeleeMiss,
+            const_cast<Unit*>(this), const_cast<Unit*>(victim), nullptr, &missChance, nullptr,
+            nullptr, nullptr, static_cast<uint8>(attType), skillDiff);
+    // @tswow-end
+
     // Limit miss chance from 0 to 60%
     if (missChance < 0.0f)
         return 0.0f;
@@ -15151,6 +15263,11 @@ bool Unit::HandleSpellClick(Unit* clicker, int8 seatId)
         result = true;
     }
 
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    if (creature)
+        sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::SpellClick, clicker, nullptr,
+            0, 0, result);
+    // @tswow-end
     if (creature && creature->IsAIEnabled)
         creature->AI()->OnSpellClick(clicker, result);
 

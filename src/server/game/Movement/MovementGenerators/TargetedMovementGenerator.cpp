@@ -471,7 +471,9 @@ void ChaseMovementGenerator<T>::MovementInform(T* owner)
         {
             // Pass back the GUIDLow of the target. If it is pet's owner then PetAI will handle
             if (CreatureAI* AI = owner->ToCreature()->AI())
-                AI->MovementInform(CHASE_MOTION_TYPE, GetTarget()->GetGUID().GetCounter());
+                // @tswow-begin: route movement completion through generic lifecycle dispatch
+                AI->NotifyMovementInform(CHASE_MOTION_TYPE, GetTarget()->GetGUID().GetCounter());
+                // @tswow-end
             break;
         }
         case CHASE_MODE_DISTANCING:
@@ -781,7 +783,9 @@ void FollowMovementGenerator<T>::MovementInform(T* owner)
 
     // Pass back the GUIDLow of the target. If it is pet's owner then PetAI will handle
     if (CreatureAI* AI = owner->ToCreature()->AI())
-        AI->MovementInform(FOLLOW_MOTION_TYPE, GetTarget()->GetGUID().GetCounter());
+        // @tswow-begin: route movement completion through generic lifecycle dispatch
+        AI->NotifyMovementInform(FOLLOW_MOTION_TYPE, GetTarget()->GetGUID().GetCounter());
+        // @tswow-end
 }
 
 //-----------------------------------------------//

@@ -6340,6 +6340,11 @@ void AuraEffect::HandlePeriodicDamageAurasTick(Unit* target, Unit* caster) const
     // Script Hook For HandlePeriodicDamageAurasTick -- Allow scripts to change the Damage pre class mitigation calculations
     sScriptMgr->ModifyPeriodicDamageAurasTick(target, caster, damage, GetSpellInfo());
 
+    // @tswow-begin: mutable periodic aura damage
+    sScriptMgr->OnAuraLifecycle(GetBase(), AuraLifecycleEvent::PeriodicDamage, this, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, &damage);
+    // @tswow-end
+
     if (target->GetAI())
     {
         target->GetAI()->OnCalculatePeriodicTickReceived(damage, caster);
@@ -6363,8 +6368,13 @@ void AuraEffect::HandlePeriodicDamageAurasTick(Unit* target, Unit* caster) const
     }
 
     // calculate crit chance
+    float critChance = GetCritChance();
+    // @tswow-begin: mutable periodic aura critical chance
+    sScriptMgr->OnAuraLifecycle(GetBase(), AuraLifecycleEvent::CalcAuraCrit, this, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, &critChance);
+    // @tswow-end
     bool crit = false;
-    if ((crit = roll_chance_f(GetCritChance())))
+    if ((crit = roll_chance_f(critChance)))
         damage = Unit::SpellCriticalDamageBonus(caster, m_spellInfo, damage, target);
 
     // Auras reducing damage from AOE spells
@@ -6453,6 +6463,11 @@ void AuraEffect::HandlePeriodicHealthLeechAuraTick(Unit* target, Unit* caster) c
     // Script Hook For HandlePeriodicHealthLeechAurasTick -- Allow scripts to change the Damage pre class mitigation calculations
     sScriptMgr->ModifyPeriodicDamageAurasTick(target, caster, damage, GetSpellInfo());
 
+    // @tswow-begin: mutable periodic aura damage
+    sScriptMgr->OnAuraLifecycle(GetBase(), AuraLifecycleEvent::PeriodicDamage, this, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, &damage);
+    // @tswow-end
+
     if (target->GetAI())
     {
         target->GetAI()->OnCalculatePeriodicTickReceived(damage, caster);
@@ -6462,8 +6477,13 @@ void AuraEffect::HandlePeriodicHealthLeechAuraTick(Unit* target, Unit* caster) c
         damage = caster->SpellDamageBonusDone(target, GetSpellInfo(), damage, DOT, GetEffIndex(), 0.0f, GetBase()->GetStackAmount());
     damage = target->SpellDamageBonusTaken(caster, GetSpellInfo(), damage, DOT, GetBase()->GetStackAmount());
 
+    float critChance = GetCritChance();
+    // @tswow-begin: mutable periodic aura critical chance
+    sScriptMgr->OnAuraLifecycle(GetBase(), AuraLifecycleEvent::CalcAuraCrit, this, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, &critChance);
+    // @tswow-end
     bool crit = false;
-    if ((crit = roll_chance_f(GetCritChance())))
+    if ((crit = roll_chance_f(critChance)))
         damage = Unit::SpellCriticalDamageBonus(caster, m_spellInfo, damage, target);
 
     // Calculate armor mitigation
@@ -6646,8 +6666,13 @@ void AuraEffect::HandlePeriodicHealAurasTick(Unit* target, Unit* caster) const
         damage = target->SpellHealingBonusTaken(caster, GetSpellInfo(), damage, DOT, GetBase()->GetStackAmount());
     }
 
+    float critChance = GetCritChance();
+    // @tswow-begin: mutable periodic aura critical chance
+    sScriptMgr->OnAuraLifecycle(GetBase(), AuraLifecycleEvent::CalcAuraCrit, this, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, &critChance);
+    // @tswow-end
     bool crit = false;
-    if ((crit = roll_chance_f(GetCritChance())))
+    if ((crit = roll_chance_f(critChance)))
         damage = Unit::SpellCriticalHealingBonus(caster, GetSpellInfo(), damage, target);
 
     LOG_DEBUG("spells.aura.effect", "PeriodicTick: {} heal of {} for {} health inflicted by {}",
@@ -6657,6 +6682,11 @@ void AuraEffect::HandlePeriodicHealAurasTick(Unit* target, Unit* caster) const
 
     // Script Hook For HandlePeriodicDamageAurasTick -- Allow scripts to change the Damage pre class mitigation calculations
     sScriptMgr->ModifyPeriodicDamageAurasTick(target, caster, heal, GetSpellInfo());
+
+    // @tswow-begin: mutable periodic aura healing amount
+    sScriptMgr->OnAuraLifecycle(GetBase(), AuraLifecycleEvent::PeriodicDamage, this, nullptr, target,
+        nullptr, nullptr, nullptr, nullptr, &heal);
+    // @tswow-end
     sScriptMgr->ModifyHealReceived(target, caster, heal, GetSpellInfo());
 
     if (target->GetAI())

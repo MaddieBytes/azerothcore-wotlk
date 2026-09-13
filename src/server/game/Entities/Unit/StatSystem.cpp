@@ -70,6 +70,12 @@ void Unit::UpdateDamagePhysical(WeaponAttackType attType)
         totalMax += tmpMax;
     }
 
+    // @tswow-begin: mutable creature physical-damage calculation
+    if (Creature* creature = ToCreature())
+        sScriptMgr->OnCreatureDamageCalculation(creature, totalMin, totalMax, creature->IsGuardian(),
+            static_cast<uint8>(attType));
+    // @tswow-end
+
     switch (attType)
     {
         case BASE_ATTACK:
@@ -260,6 +266,9 @@ void Player::UpdateResistances(uint32 school)
 
         value *= GetPctModifierValue(unitMod, TOTAL_PCT);
 
+        // @tswow-begin: mutable resistance calculation
+        sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::Resistance, value, school);
+        // @tswow-end
         SetResistance(SpellSchools(school), int32(value));
     }
     else
@@ -285,6 +294,9 @@ void Player::UpdateArmor()
 
     value *= GetPctModifierValue(unitMod, TOTAL_PCT);
 
+    // @tswow-begin: mutable armor calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::Armor, value);
+    // @tswow-end
     SetArmor(int32(value));
 
     UpdateAttackPowerAndDamage();                           // armor dependent auras update for SPELL_AURA_MOD_ATTACK_POWER_OF_ARMOR
@@ -297,7 +309,12 @@ float Player::GetHealthBonusFromStamina()
     float baseStam = stamina < 20 ? stamina : 20;
     float moreStam = stamina - baseStam;
 
-    return baseStam + (moreStam * 10.0f);
+    float health = baseStam + (moreStam * 10.0f);
+    // @tswow-begin: mutable stamina health bonus calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::StaminaHealthBonus,
+        health, baseStam, moreStam);
+    // @tswow-end
+    return health;
 }
 
 float Player::GetManaBonusFromIntellect()
@@ -307,7 +324,12 @@ float Player::GetManaBonusFromIntellect()
     float baseInt = intellect < 20 ? intellect : 20;
     float moreInt = intellect - baseInt;
 
-    return baseInt + (moreInt * 15.0f);
+    float mana = baseInt + (moreInt * 15.0f);
+    // @tswow-begin: mutable intellect mana bonus calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::IntellectManaBonus,
+        mana, baseInt, moreInt);
+    // @tswow-end
+    return mana;
 }
 
 void Player::UpdateMaxHealth()
@@ -487,6 +509,10 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
         }
     }
 
+    // @tswow-begin: mutable attack-power calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this,
+        ranged ? PlayerStatCalculation::RangedAttackPower : PlayerStatCalculation::AttackPower, val2);
+    // @tswow-end
     SetStatFlatModifier(unitMod, BASE_VALUE, val2);
 
     float base_attPower  = GetFlatModifierValue(unitMod, BASE_VALUE) * GetPctModifierValue(unitMod, BASE_PCT);
@@ -538,7 +564,11 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
 
 void Player::UpdateShieldBlockValue()
 {
-    SetUInt32Value(PLAYER_SHIELD_BLOCK, GetShieldBlockValue());
+    // @tswow-begin: mutable shield-block calculation
+    uint32 value = GetShieldBlockValue();
+    sScriptMgr->OnPlayerUIntStatCalculation(this, PlayerStatCalculation::ShieldBlock, value);
+    SetUInt32Value(PLAYER_SHIELD_BLOCK, value);
+    // @tswow-end
 }
 
 void Player::CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, bool addTotalPct, float& minDamage, float& maxDamage, uint8 damageIndex)
@@ -652,6 +682,9 @@ void Player::UpdateBlockPercentage()
 
         value = value < 0.0f ? 0.0f : value;
     }
+    // @tswow-begin: mutable block calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::BlockPercentage, value);
+    // @tswow-end
     SetStatFloatValue(PLAYER_BLOCK_PERCENTAGE, value);
 }
 
@@ -692,6 +725,10 @@ void Player::UpdateCritPercentage(WeaponAttackType attType)
     }
 
     value = value < 0.0f ? 0.0f : value;
+    // @tswow-begin: mutable critical-strike calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::CritPercentage, value,
+        static_cast<uint32>(attType));
+    // @tswow-end
     SetStatFloatValue(index, value);
 }
 
@@ -793,6 +830,9 @@ void Player::UpdateParryPercentage()
         }
     }
 
+    // @tswow-begin: mutable parry calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::ParryPercentage, value);
+    // @tswow-end
     SetStatFloatValue(PLAYER_PARRY_PERCENTAGE, value);
 }
 
@@ -834,6 +874,9 @@ void Player::UpdateDodgePercentage()
         value = value > sConfigMgr->GetOption<float>("Stats.Limits.Dodge", 95.0f) ? sConfigMgr->GetOption<float>("Stats.Limits.Dodge", 95.0f) : value;
     }
 
+    // @tswow-begin: mutable dodge calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::DodgePercentage, value);
+    // @tswow-end
     SetStatFloatValue(PLAYER_DODGE_PERCENTAGE, value);
 }
 
@@ -858,12 +901,18 @@ void Player::UpdateSpellCritChance(uint32 school)
     // Increase crit from spell crit ratings
     crit += GetRatingBonusValue(CR_CRIT_SPELL);
 
+    // @tswow-begin: mutable spell-critical calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::SpellCrit, crit, school);
+    // @tswow-end
     // Store crit value
     SetFloatValue(PLAYER_SPELL_CRIT_PERCENTAGE1 + school, crit);
 }
 
 void Player::UpdateArmorPenetration(int32 amount)
 {
+    // @tswow-begin: mutable armor-penetration calculation
+    sScriptMgr->OnPlayerIntStatCalculation(this, PlayerStatCalculation::ArmorPenetration, amount);
+    // @tswow-end
     // Store Rating Value
     SetUInt32Value(PLAYER_FIELD_COMBAT_RATING_1 + static_cast<uint16>(CR_ARMOR_PENETRATION), amount);
 }
@@ -872,18 +921,27 @@ void Player::UpdateMeleeHitChances()
 {
     m_modMeleeHitChance = (float)GetTotalAuraModifier(SPELL_AURA_MOD_HIT_CHANCE);
     m_modMeleeHitChance += GetRatingBonusValue(CR_HIT_MELEE);
+    // @tswow-begin: mutable melee-hit calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::MeleeHit, m_modMeleeHitChance);
+    // @tswow-end
 }
 
 void Player::UpdateRangedHitChances()
 {
     m_modRangedHitChance = (float)GetTotalAuraModifier(SPELL_AURA_MOD_HIT_CHANCE);
     m_modRangedHitChance += GetRatingBonusValue(CR_HIT_RANGED);
+    // @tswow-begin: mutable ranged-hit calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::RangedHit, m_modRangedHitChance);
+    // @tswow-end
 }
 
 void Player::UpdateSpellHitChances()
 {
     m_modSpellHitChance = (float)GetTotalAuraModifier(SPELL_AURA_MOD_SPELL_HIT_CHANCE);
     m_modSpellHitChance += GetRatingBonusValue(CR_HIT_SPELL);
+    // @tswow-begin: mutable spell-hit calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::SpellHit, m_modSpellHitChance);
+    // @tswow-end
 }
 
 void Player::UpdateAllSpellCritChances()
@@ -897,7 +955,9 @@ void Player::UpdateExpertise(WeaponAttackType attack)
     if (attack == RANGED_ATTACK)
         return;
 
-    float expertise = GetRatingBonusValue(CR_EXPERTISE);
+    // @tswow-begin: keep expertise mutable with the public TSWoW integer type
+    int32 expertise = int32(GetRatingBonusValue(CR_EXPERTISE));
+    // @tswow-end
 
     Item* weapon = GetWeaponForAttack(attack, true);
 
@@ -909,6 +969,11 @@ void Player::UpdateExpertise(WeaponAttackType attack)
 
     if (expertise < 0)
         expertise = 0;
+
+    // @tswow-begin: mutable expertise calculation
+    sScriptMgr->OnPlayerIntStatCalculation(this, PlayerStatCalculation::Expertise, expertise,
+        static_cast<uint32>(attack), weapon);
+    // @tswow-end
 
     switch (attack)
     {
@@ -965,6 +1030,9 @@ void Player::UpdateManaRegen()
     int32 modManaRegenInterrupt = GetTotalAuraModifier(SPELL_AURA_MOD_MANA_REGEN_INTERRUPT);
     if (modManaRegenInterrupt > 100)
         modManaRegenInterrupt = 100;
+    // @tswow-begin: mutable mana-regeneration calculation
+    sScriptMgr->OnPlayerManaRegenCalculation(this, power_regen, power_regen_mp5, modManaRegenInterrupt);
+    // @tswow-end
     SetStatFloatValue(UNIT_FIELD_POWER_REGEN_INTERRUPTED_FLAT_MODIFIER + AsUnderlyingType(POWER_MANA), power_regen_mp5 + CalculatePct(power_regen, modManaRegenInterrupt));
 
     SetStatFloatValue(UNIT_FIELD_POWER_REGEN_FLAT_MODIFIER + AsUnderlyingType(POWER_MANA), power_regen_mp5 + power_regen);
@@ -998,6 +1066,10 @@ void Player::UpdateRuneRegen(RuneType rune)
         return;
 
     float regen = float(1 * IN_MILLISECONDS) / float(cooldown);
+    // @tswow-begin: mutable rune-regeneration calculation
+    sScriptMgr->OnPlayerFloatStatCalculation(this, PlayerStatCalculation::RuneRegen, regen,
+        static_cast<uint32>(rune));
+    // @tswow-end
     SetFloatValue(PLAYER_RUNE_REGEN_1 + uint8(rune), regen);
 }
 
@@ -1055,6 +1127,10 @@ void Creature::UpdateResistances(uint32 school)
     if (school > SPELL_SCHOOL_NORMAL)
     {
         float value = GetTotalAuraModValue(UnitMods(UNIT_MOD_RESISTANCE_START + school));
+        // @tswow-begin: mutable creature resistance calculation
+        sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::Resistance, value,
+            IsGuardian(), school);
+        // @tswow-end
         SetResistance(SpellSchools(school), int32(value));
     }
     else
@@ -1064,12 +1140,18 @@ void Creature::UpdateResistances(uint32 school)
 void Creature::UpdateArmor()
 {
     float value = GetTotalAuraModValue(UNIT_MOD_ARMOR);
+    // @tswow-begin: mutable creature armor calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::Armor, value, false);
+    // @tswow-end
     SetArmor(int32(value));
 }
 
 void Creature::UpdateMaxHealth()
 {
     float value = GetTotalAuraModValue(UNIT_MOD_HEALTH);
+    // @tswow-begin: mutable creature maximum-health calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::MaxHealth, value, false);
+    // @tswow-end
     SetMaxHealth(uint32(value));
 }
 
@@ -1078,6 +1160,10 @@ void Creature::UpdateMaxPower(Powers power)
     UnitMods unitMod = UnitMods(static_cast<uint16>(UNIT_MOD_POWER_START) + power);
 
     float value  = GetTotalAuraModValue(unitMod);
+    // @tswow-begin: mutable creature maximum-power calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::MaxPower, value, false,
+        static_cast<uint32>(power));
+    // @tswow-end
     SetMaxPower(power, uint32(value));
 }
 
@@ -1099,6 +1185,11 @@ void Creature::UpdateAttackPowerAndDamage(bool ranged)
     float baseAttackPower       = GetFlatModifierValue(unitMod, BASE_VALUE) * GetPctModifierValue(unitMod, BASE_PCT);
     float attackPowerMod        = GetFlatModifierValue(unitMod, TOTAL_VALUE);
     float attackPowerMultiplier = GetPctModifierValue(unitMod, TOTAL_PCT) - 1.0f;
+
+    // @tswow-begin: mutable creature attack-power calculation
+    sScriptMgr->OnCreatureAttackPowerCalculation(this, baseAttackPower, attackPowerMod,
+        attackPowerMultiplier, false, ranged);
+    // @tswow-end
 
     SetInt32Value(index, uint32(baseAttackPower));      // UNIT_FIELD_(RANGED)_ATTACK_POWER
     SetInt32Value(indexMod, uint32(attackPowerMod));    // UNIT_FIELD_(RANGED)_ATTACK_POWER_MODS
@@ -1234,6 +1325,9 @@ void Guardian::UpdateArmor()
     value += std::max<float>(GetStat(STAT_AGILITY) - GetCreateStat(STAT_AGILITY), 0.0f) * 2.0f;
     value += GetFlatModifierValue(UNIT_MOD_ARMOR, TOTAL_VALUE);
     value *= GetPctModifierValue(UNIT_MOD_ARMOR, TOTAL_PCT);
+    // @tswow-begin: mutable guardian armor calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::Armor, value, true);
+    // @tswow-end
     SetArmor(int32(value));
 }
 
@@ -1279,6 +1373,10 @@ void Guardian::UpdateMaxHealth()
     value += GetFlatModifierValue(unitMod, TOTAL_VALUE) + stamina * multiplicator;
     value *= GetPctModifierValue(unitMod, TOTAL_PCT);
 
+    // @tswow-begin: mutable guardian maximum-health calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::MaxHealth, value, true);
+    // @tswow-end
+
     SetMaxHealth((uint32)value);
 }
 
@@ -1313,6 +1411,11 @@ void Guardian::UpdateMaxPower(Powers power)
     value += GetFlatModifierValue(unitMod, TOTAL_VALUE) + addValue * multiplicator;
     value *= GetPctModifierValue(unitMod, TOTAL_PCT);
 
+    // @tswow-begin: mutable guardian maximum-power calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::MaxPower, value, true,
+        static_cast<uint32>(power));
+    // @tswow-end
+
     SetMaxPower(power, uint32(value));
 }
 
@@ -1337,6 +1440,11 @@ void Guardian::UpdateAttackPowerAndDamage(bool ranged)
     float base_attPower  = GetFlatModifierValue(unitMod, BASE_VALUE) * GetPctModifierValue(unitMod, BASE_PCT);
     float attPowerMod = GetFlatModifierValue(unitMod, TOTAL_VALUE);
     float attPowerMultiplier = GetPctModifierValue(unitMod, TOTAL_PCT) - 1.0f;
+
+    // @tswow-begin: mutable guardian attack-power calculation
+    sScriptMgr->OnCreatureAttackPowerCalculation(this, base_attPower, attPowerMod,
+        attPowerMultiplier, true, ranged);
+    // @tswow-end
 
     //UNIT_FIELD_(RANGED)_ATTACK_POWER field
     SetInt32Value(UNIT_FIELD_ATTACK_POWER, (int32)base_attPower);

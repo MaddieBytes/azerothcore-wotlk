@@ -185,6 +185,9 @@ public:
 
     // Called at waypoint reached or point movement finished
     virtual void MovementInform(uint32 /*type*/, uint32 /*id*/) {}
+    // @tswow-begin: generic movement completion lifecycle dispatch
+    void NotifyMovementInform(uint32 type, uint32 id);
+    // @tswow-end
 
     // Called at MovePath End
     virtual void PathEndReached(uint32 /*pathId*/) {}

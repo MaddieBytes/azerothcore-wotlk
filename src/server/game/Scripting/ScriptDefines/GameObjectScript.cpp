@@ -127,6 +127,10 @@ uint32 ScriptMgr::GetDialogStatus(Player* player, GameObject* go)
     ASSERT(player);
     ASSERT(go);
 
+    // @tswow-begin: generic game-object dialog notification
+    OnGameObjectDialogStatus(go, player);
+    // @tswow-end
+
     auto tempScript = ScriptRegistry<GameObjectScript>::GetScriptById(go->GetScriptId());
     return tempScript ? tempScript->GetDialogStatus(player, go) : DIALOG_STATUS_SCRIPTED_NO_STATUS;
 }

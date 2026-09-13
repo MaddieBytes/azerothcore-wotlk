@@ -20,12 +20,68 @@
 
 #include "ScriptObject.h"
 
+// @tswow-begin: generic mutable creature stat calculations
+enum class CreatureStatCalculation : uint8
+{
+    Resistance,
+    Armor,
+    MaxHealth,
+    MaxPower,
+    LevelMaxHealth,
+    LevelMaxMana,
+    LevelArmor
+};
+// @tswow-end
+
+// @tswow-begin: generic creature AI lifecycle dispatch
+enum class CreatureLifecycleEvent : uint8
+{
+    JustEnteredCombat,
+    JustEngagedWith,
+    KilledUnit,
+    Summoned,
+    IsSummoned,
+    SummonDespawn,
+    Despawn,
+    SummonDies,
+    ReceiveEmote,
+    CorpseRemoved,
+    PassengerBoarded,
+    Charmed,
+    ReachedHome,
+    OwnerAttacked,
+    OwnerAttacks,
+    WaypointStarted,
+    WaypointReached,
+    WaypointPathEnded,
+    UpdateAI,
+    MoveInLOS,
+    HitBySpell,
+    SpellHitTarget,
+    SpellClick,
+    GenerateLoot,
+    SpellCastFinished,
+    JustAppeared,
+    CanGeneratePickPocketLoot,
+    GeneratePickPocketLoot,
+    GenerateSkinningLoot,
+    SendVendorItem,
+    CalcBaseGain,
+    CalcColorCode,
+    MovementInform
+};
+// @tswow-end
+
 class AllCreatureScript : public ScriptObject
 {
 protected:
     AllCreatureScript(char const* name);
 
 public:
+    // @tswow-begin: cancellable creature world-add hook
+    [[nodiscard]] virtual bool CanCreatureAddWorld(Creature* /*creature*/) { return true; }
+    // @tswow-end
+
     // Called from End of Creature Update.
     virtual void OnAllCreatureUpdate(Creature* /*creature*/, uint32 /*diff*/) { }
 
@@ -34,6 +90,28 @@ public:
 
     // Called from End of Creature SelectLevel.
     virtual void OnCreatureSelectLevel(CreatureTemplate const* /*cinfo*/, Creature* /*creature*/) { }
+
+    // @tswow-begin: generic mutable creature stat calculations
+    virtual void OnCreatureFloatStatCalculation(Creature* /*creature*/, CreatureStatCalculation /*type*/,
+        float& /*value*/, bool /*isGuardian*/, float /*argument*/) { }
+    virtual void OnCreatureUIntStatCalculation(Creature* /*creature*/, CreatureStatCalculation /*type*/,
+        uint32& /*value*/, float /*modifier*/, uint32 /*base*/) { }
+    virtual void OnCreatureBaseDamageCalculation(Creature* /*creature*/, float& /*minimum*/, float& /*maximum*/,
+        float /*baseDamage*/) { }
+    virtual void OnCreatureBaseAttackPowerCalculation(Creature* /*creature*/, uint32& /*attackPower*/,
+        uint32& /*rangedAttackPower*/) { }
+    virtual void OnCreatureAttackPowerCalculation(Creature* /*creature*/, float& /*base*/, float& /*modifier*/,
+        float& /*multiplier*/, bool /*isGuardian*/, bool /*ranged*/) { }
+    virtual void OnCreatureDamageCalculation(Creature* /*creature*/, float& /*minimum*/, float& /*maximum*/,
+        bool /*isGuardian*/, uint8 /*attackType*/) { }
+    // @tswow-end
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    virtual void OnCreatureLifecycle(Creature* /*creature*/, CreatureLifecycleEvent /*type*/,
+        WorldObject* /*primary*/, WorldObject* /*secondary*/, uint32 /*value*/, uint32 /*secondaryValue*/,
+        bool /*apply*/, SpellInfo const* /*spellInfo*/, Loot* /*loot*/ = nullptr,
+        ItemTemplate const* /*itemTemplate*/ = nullptr, bool* /*mutableResult*/ = nullptr,
+        uint32* /*mutableValue*/ = nullptr) { }
+    // @tswow-end
 
     /**
      * @brief This hook runs after add creature in world

@@ -134,6 +134,25 @@ void ScriptMgr::OnUnitDeath(Unit* unit, Unit* killer)
     CALL_ENABLED_HOOKS(UnitScript, UNITHOOK_ON_UNIT_DEATH, script->OnUnitDeath(unit, killer));
 }
 
+// @tswow-begin: early unit death lifecycle hook
+void ScriptMgr::OnUnitDeathEarly(Unit* unit, Unit* killer)
+{
+    CALL_ENABLED_HOOKS(UnitScript, UNITHOOK_ON_UNIT_DEATH_EARLY, script->OnUnitDeathEarly(unit, killer));
+}
+// @tswow-end
+
+// @tswow-begin: generic unit calculation and lifecycle dispatch
+void ScriptMgr::OnUnitLifecycle(Unit* unit, UnitLifecycleEvent type, Unit* other,
+    SpellInfo const* spellInfo, CalcDamageInfo* damageInfo, float* floatValue, uint32* uintValue,
+    bool* boolValue, uint64 firstValue, uint64 secondValue, uint32 argument, uint32 secondaryArgument,
+    bool flag)
+{
+    CALL_ENABLED_HOOKS(UnitScript, UNITHOOK_ON_UNIT_LIFECYCLE,
+        script->OnUnitLifecycle(unit, type, other, spellInfo, damageInfo, floatValue, uintValue, boolValue,
+            firstValue, secondValue, argument, secondaryArgument, flag));
+}
+// @tswow-end
+
 void ScriptMgr::OnUnitSetShapeshiftForm(Unit* unit, uint8 form)
 {
     CALL_ENABLED_HOOKS(UnitScript, UNITHOOK_ON_UNIT_SET_SHAPESHIFT_FORM, script->OnUnitSetShapeshiftForm(unit, form));

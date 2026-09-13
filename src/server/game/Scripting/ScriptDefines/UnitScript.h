@@ -44,12 +44,36 @@ enum UnitHook
     UNITHOOK_ON_UNIT_EXIT_COMBAT,
     UNITHOOK_ON_UNIT_DEATH,
     UNITHOOK_ON_UNIT_SET_SHAPESHIFT_FORM,
+    // @tswow-begin: append extension IDs so upstream UnitHook values stay stable
+    UNITHOOK_ON_UNIT_DEATH_EARLY,
+    UNITHOOK_ON_UNIT_LIFECYCLE,
+    // @tswow-end
     UNITHOOK_END
 };
 
 enum ReputationRank : uint8;
 class ByteBuffer;
 struct BuildValuesCachePosPointers;
+// @tswow-begin: generic unit calculation and lifecycle dispatch
+struct CalcDamageInfo;
+// @tswow-end
+
+// @tswow-begin: generic unit calculation and lifecycle dispatch
+enum class UnitLifecycleEvent : uint8
+{
+    CalcMissChance,
+    MeleeDamageEarly,
+    MeleeDamageLate,
+    CalcMeleeCrit,
+    CalcThreatEarly,
+    CalcThreatLate,
+    CalcScaleThreat,
+    ExitCombatWith,
+    SetTarget,
+    LiquidStatusChanged,
+    OutdoorsChanged
+};
+// @tswow-end
 
 class UnitScript : public ScriptObject
 {
@@ -109,6 +133,16 @@ public:
     virtual void OnUnitEnterCombat(Unit* /*unit*/, Unit* /*victim*/) { }
     virtual void OnUnitExitCombat(Unit* /*unit*/) { }
     virtual void OnUnitDeath(Unit* /*unit*/, Unit* /*killer*/) { }
+    // @tswow-begin: early unit death lifecycle hook
+    virtual void OnUnitDeathEarly(Unit* /*unit*/, Unit* /*killer*/) { }
+    // @tswow-end
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    virtual void OnUnitLifecycle(Unit* /*unit*/, UnitLifecycleEvent /*type*/, Unit* /*other*/ = nullptr,
+        SpellInfo const* /*spellInfo*/ = nullptr, CalcDamageInfo* /*damageInfo*/ = nullptr,
+        float* /*floatValue*/ = nullptr, uint32* /*uintValue*/ = nullptr, bool* /*boolValue*/ = nullptr,
+        uint64 /*firstValue*/ = 0, uint64 /*secondValue*/ = 0, uint32 /*argument*/ = 0,
+        uint32 /*secondaryArgument*/ = 0, bool /*flag*/ = false) { }
+    // @tswow-end
     virtual void OnUnitSetShapeshiftForm(Unit* /*unit*/, uint8 /*form*/) { }
 };
 

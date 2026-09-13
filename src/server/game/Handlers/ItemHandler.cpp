@@ -908,6 +908,14 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid, uint32 vendorEntry)
         {
             if (ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(item->item))
             {
+                bool shouldSend = true;
+                // @tswow-begin: mutable vendor-item visibility dispatch
+                sScriptMgr->OnCreatureLifecycle(vendor, CreatureLifecycleEvent::SendVendorItem,
+                    _player, nullptr, 0, 0, false, nullptr, nullptr, itemTemplate, &shouldSend);
+                // @tswow-end
+                if (!shouldSend)
+                    continue;
+
                 if (!(itemTemplate->AllowableClass & _player->getClassMask()) && itemTemplate->Bonding == BIND_WHEN_PICKED_UP && !_player->IsGameMaster())
                 {
                     continue;

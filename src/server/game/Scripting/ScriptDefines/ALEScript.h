@@ -35,6 +35,10 @@ public:
      */
     virtual void OnWeatherChange(Weather* /*weather*/, WeatherState /*state*/, float /*grade*/) { }
 
+    // @tswow-begin: generic weather update event
+    virtual void OnWeatherUpdate(Weather* /*weather*/, uint32 /*diff*/) { }
+    // @tswow-end
+
     // Called when the area trigger is activated by a player.
     [[nodiscard]] virtual bool CanAreaTrigger(Player* /*player*/, AreaTrigger const* /*trigger*/) { return false; }
 };

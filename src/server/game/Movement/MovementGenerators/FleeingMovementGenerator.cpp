@@ -253,7 +253,9 @@ void TimedFleeingMovementGenerator::Finalize(Unit* owner)
     {
         if (CreatureAI* AI = ownerCreature->AI())
         {
-            AI->MovementInform(TIMED_FLEEING_MOTION_TYPE, 0);
+            // @tswow-begin: route movement completion through generic lifecycle dispatch
+            AI->NotifyMovementInform(TIMED_FLEEING_MOTION_TYPE, 0);
+            // @tswow-end
         }
     }
 }

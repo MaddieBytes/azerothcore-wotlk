@@ -303,6 +303,11 @@ void Creature::AddToWorld()
     ///- Register the creature for guid lookup
     if (!IsInWorld())
     {
+        // @tswow-begin: cancellable creature world-add hook
+        if (!sScriptMgr->CanCreatureAddWorld(this))
+            return;
+        // @tswow-end
+
         // pussywizard: motion master needs to be initialized before OnCreatureCreate, which may set death state to JUST_DIED, to prevent crash
         // it's also initialized in AIM_Initialize(), few lines below, but it's not a problem
         Motion_Initialize();
@@ -429,6 +434,10 @@ void Creature::RemoveCorpse(bool setSpawnTime, bool skipVisibility)
             DestroyForVisiblePlayers(); // pussywizard: previous UpdateObjectVisibility()
         loot.clear();
         uint32 respawnDelay = m_respawnDelay;
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::CorpseRemoved, nullptr, nullptr,
+            respawnDelay);
+        // @tswow-end
         if (IsAIEnabled)
             AI()->CorpseRemoved(respawnDelay);
 
@@ -457,6 +466,10 @@ void Creature::RemoveCorpse(bool setSpawnTime, bool skipVisibility)
         // A fresh creature will be spawned by ProcessRespawns() when the timer expires.
         loot.clear();
         uint32 respawnDelay = m_respawnDelay;
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::CorpseRemoved, nullptr, nullptr,
+            respawnDelay);
+        // @tswow-end
         if (IsAIEnabled)
             AI()->CorpseRemoved(respawnDelay);
 
@@ -640,6 +653,10 @@ bool Creature::UpdateEntry(uint32 Entry, CreatureData const* data, bool changele
     SetMeleeDamageSchool(SpellSchools(cInfo->dmgschool));
     CreatureBaseStats const* stats = sObjectMgr->GetCreatureBaseStats(GetLevel(), cInfo->unit_class);
     float armor = stats->GenerateArmor(cInfo);
+    // @tswow-begin: mutable level-dependent creature armor calculation
+    sScriptMgr->OnCreatureFloatStatCalculation(this, CreatureStatCalculation::LevelArmor, armor, false,
+        stats->BaseArmor);
+    // @tswow-end
     SetStatFlatModifier(UNIT_MOD_ARMOR,             BASE_VALUE, armor);
     SetStatFlatModifier(UNIT_MOD_RESISTANCE_HOLY,   BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_HOLY]));
     SetStatFlatModifier(UNIT_MOD_RESISTANCE_FIRE,   BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_FIRE]));
@@ -708,6 +725,10 @@ void Creature::Update(uint32 diff)
     if (IsAIEnabled && TriggerJustRespawned && getDeathState() != DeathState::Dead)
     {
         TriggerJustRespawned = false;
+
+        // @tswow-begin: generic creature appearance lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::JustAppeared);
+        // @tswow-end
 
         // Skip for temp summons: InitializeAI already reset them, and JustRespawned would clobber state set synchronously during SUMMON.
         if (!IsSummon())
@@ -881,6 +902,9 @@ void Creature::Update(uint32 diff)
             {
                 // do not allow the AI to be changed during update
                 m_AI_locked = true;
+                // @tswow-begin: generic creature AI lifecycle dispatch
+                sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::UpdateAI, nullptr, nullptr, diff);
+                // @tswow-end
                 i_AI->UpdateAI(diff);
                 m_AI_locked = false;
             }
@@ -1516,6 +1540,11 @@ void Creature::SelectLevel(bool changelevel)
     uint32 basehp = std::max<uint32>(1, stats->GenerateHealth(cInfo));
     uint32 health = uint32(basehp * healthmod);
 
+    // @tswow-begin: mutable level-dependent creature health calculation
+    sScriptMgr->OnCreatureUIntStatCalculation(this, CreatureStatCalculation::LevelMaxHealth, health,
+        healthmod, basehp);
+    // @tswow-end
+
     SetCreateHealth(health);
     SetMaxHealth(health);
     SetHealth(health);
@@ -1523,6 +1552,11 @@ void Creature::SelectLevel(bool changelevel)
 
     // mana
     uint32 mana = stats->GenerateMana(cInfo);
+
+    // @tswow-begin: mutable level-dependent creature mana calculation
+    sScriptMgr->OnCreatureUIntStatCalculation(this, CreatureStatCalculation::LevelMaxMana, mana, 0.0f,
+        stats->BaseMana);
+    // @tswow-end
 
     SetCreateMana(mana);
     SetMaxPower(POWER_MANA, mana);                          //MAX Mana
@@ -1540,6 +1574,10 @@ void Creature::SelectLevel(bool changelevel)
     float weaponBaseMinDamage = basedamage;
     float weaponBaseMaxDamage = basedamage * 1.5;
 
+    // @tswow-begin: mutable level-dependent creature base-damage calculation
+    sScriptMgr->OnCreatureBaseDamageCalculation(this, weaponBaseMinDamage, weaponBaseMaxDamage, basedamage);
+    // @tswow-end
+
     SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, weaponBaseMinDamage);
     SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, weaponBaseMaxDamage);
 
@@ -1549,8 +1587,13 @@ void Creature::SelectLevel(bool changelevel)
     SetBaseWeaponDamage(RANGED_ATTACK, MINDAMAGE, weaponBaseMinDamage);
     SetBaseWeaponDamage(RANGED_ATTACK, MAXDAMAGE, weaponBaseMaxDamage);
 
-    SetStatFlatModifier(UNIT_MOD_ATTACK_POWER, BASE_VALUE, stats->AttackPower);
-    SetStatFlatModifier(UNIT_MOD_ATTACK_POWER_RANGED, BASE_VALUE, stats->RangedAttackPower);
+    // @tswow-begin: mutable level-dependent creature attack-power calculation
+    uint32 attackPower = stats->AttackPower;
+    uint32 rangedAttackPower = stats->RangedAttackPower;
+    sScriptMgr->OnCreatureBaseAttackPowerCalculation(this, attackPower, rangedAttackPower);
+    SetStatFlatModifier(UNIT_MOD_ATTACK_POWER, BASE_VALUE, attackPower);
+    SetStatFlatModifier(UNIT_MOD_ATTACK_POWER_RANGED, BASE_VALUE, rangedAttackPower);
+    // @tswow-end
 
     sScriptMgr->OnCreatureSelectLevel(cInfo, this);
 }
@@ -1939,6 +1982,12 @@ bool Creature::CanStartAttack(Unit const* who, bool force) const
 
     if (!CanCreatureAttack(who))
         return false;
+
+    // @tswow-begin: contextual creature difficulty-color dispatch
+    if (Player* player = const_cast<Unit*>(who)->ToPlayer())
+        (void)Acore::XP::GetColorCode(player, const_cast<Creature*>(this),
+            who->getLevelForTarget(this), getLevelForTarget(who));
+    // @tswow-end
 
     return IsWithinLOSInMap(who);
 }
@@ -2908,6 +2957,9 @@ void Creature::AtEngage(Unit* target)
         }
     }
 
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    sScriptMgr->OnCreatureLifecycle(this, CreatureLifecycleEvent::JustEngagedWith, target);
+    // @tswow-end
     if (CreatureAI* ai = AI())
     {
         ai->JustEngagedWith(target);
@@ -3579,6 +3631,11 @@ void Creature::SetDisplayFromModel(uint32 modelIdx)
 
 void Creature::SetTarget(ObjectGuid guid)
 {
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    ObjectGuid const oldTarget = _focusSpell ? _spellFocusTarget : GetGuidValue(UNIT_FIELD_TARGET);
+    sScriptMgr->OnUnitLifecycle(this, UnitLifecycleEvent::SetTarget, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, guid.GetRawValue(), oldTarget.GetRawValue());
+    // @tswow-end
     if (_focusSpell)
         _spellFocusTarget = guid;
     else

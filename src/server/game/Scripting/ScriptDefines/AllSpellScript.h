@@ -19,6 +19,7 @@
 #define SCRIPT_OBJECT_ALL_SPELL_SCRIPT_H_
 
 #include "ScriptObject.h"
+#include <list>
 #include <vector>
 
 enum AllSpellHook
@@ -38,11 +39,113 @@ enum AllSpellHook
     ALLSPELLHOOK_ON_CAST,
     ALLSPELLHOOK_ON_PREPARE,
     ALLSPELLHOOK_ON_IS_AURA_EXCLUSIVE_BY_SPECIFIC_WITH,
+    // @tswow-begin: generic spell script lifecycle dispatch
+    ALLSPELLHOOK_ON_LIFECYCLE,
+    // @tswow-end
+    // @tswow-begin: generic aura script lifecycle dispatch
+    ALLSPELLHOOK_ON_AURA_LIFECYCLE,
+    // @tswow-begin: generic spell calculation dispatch
+    ALLSPELLHOOK_ON_CALCULATION,
+    // @tswow-begin: cancellable spell effect dispatch
+    ALLSPELLHOOK_CAN_HANDLE_EFFECT,
+    // @tswow-end
+    // @tswow-begin: generic spell damage lifecycle dispatch
+    ALLSPELLHOOK_ON_DAMAGE,
+    // @tswow-end
+    // @tswow-begin: generic spell target-selection dispatch
+    ALLSPELLHOOK_ON_TARGET_SELECT,
+    // @tswow-end
+    // @tswow-begin: generic player spellbook dispatch
+    ALLSPELLHOOK_ON_SPELLBOOK,
+    // @tswow-end
+    // @tswow-begin: mutable spell resistance and absorption dispatch
+    ALLSPELLHOOK_ON_RESIST_ABSORB,
+    // @tswow-end
+    // @tswow-end
+    // @tswow-end
     ALLSPELLHOOK_END
 };
 
+// @tswow-begin: generic spell script lifecycle dispatch
+enum class SpellLifecycleEvent : uint8
+{
+    BeforeCast,
+    AfterCast,
+    BeforeHit,
+    Hit,
+    AfterHit,
+    Cancel,
+    QuestFinish,
+    EffectApplyGlyph,
+    CalcCrit,
+    SuccessfulDispel
+};
+// @tswow-end
+
+// @tswow-begin: generic spell damage lifecycle dispatch
+enum class SpellDamagePhase : uint8
+{
+    Early,
+    Late
+};
+// @tswow-end
+
+// @tswow-begin: generic aura script lifecycle dispatch
+enum class AuraLifecycleEvent : uint8
+{
+    CheckAreaTarget,
+    Dispel,
+    AfterDispel,
+    EffectApply,
+    EffectRemove,
+    AfterEffectApply,
+    AfterEffectRemove,
+    EffectPeriodic,
+    Tick,
+    EffectCalcAmount,
+    EffectCalcPeriodic,
+    EffectCalcSpellMod,
+    EffectAbsorb,
+    EffectAfterAbsorb,
+    EffectManaShield,
+    EffectAfterManaShield,
+    EffectSplit,
+    CheckProc,
+    CheckEffectProc,
+    PrepareProc,
+    Proc,
+    AfterProc,
+    EffectProc,
+    AfterEffectProc,
+    SetDuration,
+    PeriodicDamage,
+    CalcAuraCrit
+};
+// @tswow-end
+
+// @tswow-begin: generic spell calculation dispatch
+enum class SpellCalculationEvent : uint8
+{
+    Miss,
+    SpellPowerLevelPenalty,
+    Reflect,
+    Hit,
+    Resist,
+    MeleeMiss
+};
+// @tswow-end
+
 enum SpellCastResult : uint8;
 enum SpellEffIndex : uint8;
+// @tswow-begin: generic aura script lifecycle dispatch
+class Aura;
+class AuraApplication;
+class AuraEffect;
+class DispelInfo;
+class DamageInfo;
+class ProcEventInfo;
+class SpellModifier;
+// @tswow-end
 
 class AllSpellScript : public ScriptObject
 {
@@ -106,6 +209,64 @@ public:
     virtual void OnSpellCast(Spell* /*spell*/, Unit* /*caster*/, SpellInfo const* /*spellInfo*/, bool /*skipCheck*/) { }
 
     virtual void OnSpellPrepare(Spell* /*spell*/, Unit* /*caster*/, SpellInfo const* /*spellInfo*/) { }
+
+    // @tswow-begin: generic spell script lifecycle dispatch
+    [[nodiscard]] virtual bool OnSpellLifecycle(Spell* /*spell*/, SpellLifecycleEvent /*type*/,
+        uint32 /*value*/, Player* /*player*/ = nullptr, Quest const* /*quest*/ = nullptr,
+        bool* /*boolValue*/ = nullptr, float* /*floatValue*/ = nullptr) { return true; }
+    // @tswow-end
+
+    // @tswow-begin: generic aura script lifecycle dispatch
+    [[nodiscard]] virtual bool OnAuraLifecycle(Aura* /*aura*/, AuraLifecycleEvent /*type*/,
+        AuraEffect const* /*effect*/ = nullptr, AuraApplication const* /*application*/ = nullptr,
+        Unit* /*target*/ = nullptr, DispelInfo* /*dispelInfo*/ = nullptr, DamageInfo* /*damageInfo*/ = nullptr,
+        ProcEventInfo* /*procInfo*/ = nullptr, int32* /*intValue*/ = nullptr, uint32* /*uintValue*/ = nullptr,
+        bool* /*boolValue*/ = nullptr, SpellModifier* /*spellModifier*/ = nullptr, uint32 /*mode*/ = 0,
+        float* /*floatValue*/ = nullptr)
+    {
+        return true;
+    }
+    // @tswow-end
+    // @tswow-begin: generic spell calculation dispatch
+    virtual void OnSpellCalculation(SpellInfo const* /*spellInfo*/, SpellCalculationEvent /*type*/,
+        WorldObject* /*caster*/ = nullptr, Unit* /*target*/ = nullptr, Spell* /*spell*/ = nullptr,
+        float* /*floatValue*/ = nullptr, int32* /*intValue*/ = nullptr, uint32* /*uintValue*/ = nullptr,
+        uint32* /*secondaryUIntValue*/ = nullptr, uint8 /*attackType*/ = 0, int32 /*argument*/ = 0) { }
+    // @tswow-end
+    // @tswow-begin: cancellable spell effect dispatch
+    [[nodiscard]] virtual bool CanHandleSpellEffect(Spell* /*spell*/, SpellEffectInfo const* /*effect*/,
+        uint32 /*mode*/, Unit* /*unitTarget*/, Item* /*itemTarget*/, GameObject* /*gameObjectTarget*/,
+        Corpse* /*corpseTarget*/) { return true; }
+    // @tswow-end
+    // @tswow-begin: generic spell damage lifecycle dispatch
+    virtual void OnSpellDamage(Spell* /*spell*/, SpellDamagePhase /*phase*/,
+        SpellNonMeleeDamage* /*damageInfo*/, int32* /*earlyDamage*/, uint32* /*lateDamage*/,
+        uint8 /*attackType*/, bool /*critical*/, uint32 /*effectMask*/) { }
+    // @tswow-end
+    // @tswow-begin: generic spell target-selection dispatch
+    [[nodiscard]] virtual bool CanSelectSpellObjectAreaTarget(Spell* /*spell*/,
+        std::list<WorldObject*>& /*targets*/, uint32 /*effectIndex*/,
+        SpellImplicitTargetInfo const& /*targetType*/) { return true; }
+    [[nodiscard]] virtual bool CanSelectSpellObjectTarget(Spell* /*spell*/, WorldObject*& /*target*/,
+        uint32 /*effectIndex*/, SpellImplicitTargetInfo const& /*targetType*/) { return true; }
+    [[nodiscard]] virtual bool CanSelectSpellDestinationTarget(Spell* /*spell*/, SpellDestination& /*target*/,
+        uint32 /*effectIndex*/, SpellImplicitTargetInfo const& /*targetType*/) { return true; }
+    // @tswow-end
+    // @tswow-begin: generic player spellbook dispatch
+    virtual void OnSpellLearn(SpellInfo const* /*spellInfo*/, Player* /*player*/, bool /*active*/,
+        bool /*disabled*/, bool /*superseded*/, uint32 /*fromSkill*/) { }
+    virtual void OnSpellUnlearn(SpellInfo const* /*spellInfo*/, Player* /*player*/, bool /*disabled*/,
+        bool /*learnLowRank*/) { }
+    virtual void OnSpellUnlearnTalent(SpellInfo const* /*spellInfo*/, Player* /*player*/,
+        uint32 /*tabIndex*/, uint32 /*tier*/, uint32 /*column*/, uint32 /*rank*/, bool /*direct*/) { }
+    // @tswow-end
+    // @tswow-begin: mutable spell resistance and absorption dispatch
+    [[nodiscard]] virtual bool CanCalculateSpellResistAbsorb(Spell* /*spell*/,
+        DamageInfo const& /*damageInfo*/, uint32& /*resistAmount*/, int32& /*absorbAmount*/)
+    {
+        return true;
+    }
+    // @tswow-end
 };
 
 // Compatibility for old scripts

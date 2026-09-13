@@ -1564,6 +1564,11 @@ void Player::SetQuestStatus(uint32 questId, QuestStatus status, bool update /*= 
 
     if (update)
         SendQuestUpdate(questId);
+
+    // @tswow-begin: generic quest state notification
+    if (Quest const* quest = sObjectMgr->GetQuestTemplate(questId))
+        sScriptMgr->OnPlayerQuestStatusChanged(this, quest);
+    // @tswow-end
 }
 
 void Player::RemoveActiveQuest(uint32 questId, bool update /*= true*/)
@@ -1577,6 +1582,11 @@ void Player::RemoveActiveQuest(uint32 questId, bool update /*= true*/)
 
     if (update)
         SendQuestUpdate(questId);
+
+    // @tswow-begin: generic quest state notification
+    if (Quest const* quest = sObjectMgr->GetQuestTemplate(questId))
+        sScriptMgr->OnPlayerQuestStatusChanged(this, quest);
+    // @tswow-end
 
     // Xinef: area auras may change on quest remove!
     UpdateZoneDependentAuras(GetZoneId());
@@ -2545,6 +2555,10 @@ void Player::SendQuestUpdateAddCreatureOrGo(Quest const* quest, ObjectGuid guid,
     uint16 log_slot = FindQuestSlot(quest->GetQuestId());
     if (log_slot < MAX_QUEST_LOG_SIZE)
         SetQuestSlotCounter(log_slot, creatureOrGO_idx, GetQuestSlotCounter(log_slot, creatureOrGO_idx) + add_count);
+
+    // @tswow-begin: generic quest objective progress notification
+    sScriptMgr->OnPlayerQuestObjectiveProgress(this, quest, creatureOrGO_idx, old_count + add_count);
+    // @tswow-end
 }
 
 void Player::SendQuestUpdateAddPlayer(Quest const* quest, uint16 old_count, uint16 add_count)

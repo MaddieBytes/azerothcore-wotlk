@@ -23,6 +23,9 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
+// @tswow-begin: battleground objective action dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "Transport.h"
 #include "Vehicle.h"
 #include "WorldPacket.h"
@@ -554,6 +557,9 @@ void BattlegroundIC::HandleKillPlayer(Player* player, Player* killer)
 
 void BattlegroundIC::EventPlayerClickedOnFlag(Player* player, GameObject* gameObject)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::ClickFlag, player, gameObject);
+    // @tswow-end
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
 
@@ -989,8 +995,11 @@ void BattlegroundIC::HandleCapturedNodes(ICNodePoint* nodePoint, bool recapture)
     }
 }
 
-void BattlegroundIC::DestroyGate(Player*  /*player*/, GameObject* go)
+void BattlegroundIC::DestroyGate(Player* player, GameObject* go)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::DestroyGate, player, go);
+    // @tswow-end
     GateStatus[GetGateIDFromEntry(go->GetEntry())] = BG_IC_GATE_DESTROYED;
     uint32 uws_open = GetWorldStateFromGateEntry(go->GetEntry(), true);
     uint32 uws_close = GetWorldStateFromGateEntry(go->GetEntry(), false);

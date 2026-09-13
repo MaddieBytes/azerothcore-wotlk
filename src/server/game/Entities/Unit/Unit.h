@@ -1243,7 +1243,11 @@ public:
     uint32 CalculateDamage(WeaponAttackType attType, bool normalized, bool addTotalPct, uint8 itemDamagesMask = 0);
     virtual void CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, bool addTotalPct, float& minDamage, float& maxDamage, uint8 damageIndex = 0) = 0;
     void CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, WeaponAttackType attackType = BASE_ATTACK, const bool sittingVictim = false);
-    void CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 damage, SpellInfo const* spellInfo, WeaponAttackType attackType = BASE_ATTACK, bool crit = false);
+    // @tswow-begin: retain active spell context for generic damage lifecycle hooks
+    void CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 damage, SpellInfo const* spellInfo,
+        WeaponAttackType attackType = BASE_ATTACK, bool crit = false, Spell* spell = nullptr,
+        uint32 effectMask = 0);
+    // @tswow-end
     float CalculateDefaultCoefficient(SpellInfo const* spellInfo, DamageEffectType damagetype) const;
 
     // Melee damage bonus
@@ -1629,7 +1633,10 @@ public:
     uint32 SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, uint32 healamount, DamageEffectType damagetype, uint32 stack = 1);
     static uint32 SpellCriticalHealingBonus(Unit const* caster, SpellInfo const* spellProto, uint32 damage, Unit const* victim);
 
-    static void CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited = false, uint8 casterLevel = 0);
+    // @tswow-begin: retain active spell context for resistance and absorption hooks
+    static void CalcAbsorbResist(DamageInfo& dmgInfo, bool Splited = false, uint8 casterLevel = 0,
+        Spell* spell = nullptr);
+    // @tswow-end
     static void CalcHealAbsorb(HealInfo& healInfo);
 
     // Energize spells

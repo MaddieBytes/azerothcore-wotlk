@@ -18,6 +18,9 @@
 #include "GridNotifiers.h"
 #include "Map.h"
 #include "ObjectAccessor.h"
+// @tswow-begin: generic creature AI lifecycle dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "Transport.h"
 #include "UpdateData.h"
 #include "WorldPacket.h"
@@ -135,6 +138,9 @@ inline void CreatureUnitRelocationWorker(Creature* c, Unit* u)
     {
         if (c->IsAIEnabled && c->CanSeeOrDetect(u, false, true))
         {
+            // @tswow-begin: generic creature AI lifecycle dispatch
+            sScriptMgr->OnCreatureLifecycle(c, CreatureLifecycleEvent::MoveInLOS, u);
+            // @tswow-end
             c->AI()->MoveInLineOfSight_Safe(u);
         }
         else if (u->IsPlayer() && u->HasStealthAura() && c->IsAIEnabled && c->CanSeeOrDetect(u, false, true, true))

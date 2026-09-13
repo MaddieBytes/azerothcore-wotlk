@@ -38,6 +38,19 @@ public:
     // Called when the item expires (is destroyed).
     [[nodiscard]] virtual bool CanItemExpire(Player* /*player*/, ItemTemplate const* /*proto*/) { return true; }
 
+    // @tswow-begin: global cancellable item combat-spell hook
+    [[nodiscard]] virtual bool CanCastItemCombatSpell(Player* /*player*/, Unit* /*victim*/,
+        SpellInfo const* /*spellInfo*/, Item* /*item*/) { return true; }
+    // @tswow-end
+
+    // Called when a player selects an option in an item gossip window
+    // @tswow-begin: cancellable item gossip hooks
+    [[nodiscard]] virtual bool CanItemGossipSelect(Player* /*player*/, Item* /*item*/, uint32 /*sender*/,
+        uint32 /*action*/) { return true; }
+    [[nodiscard]] virtual bool CanItemGossipSelectCode(Player* /*player*/, Item* /*item*/, uint32 /*sender*/,
+        uint32 /*action*/, char const* /*code*/) { return true; }
+    // @tswow-end
+
     // Called when a player selects an option in an item gossip window
     virtual void OnItemGossipSelect(Player* /*player*/, Item* /*item*/, uint32 /*sender*/, uint32 /*action*/) { }
 

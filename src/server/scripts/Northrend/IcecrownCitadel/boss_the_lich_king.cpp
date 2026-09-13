@@ -685,7 +685,9 @@ public:
 
         void JustEngagedWith(Unit* target) override
         {
-            if (!instance->CheckRequiredBosses(DATA_THE_LICH_KING, target->ToPlayer()) || !me->IsVisible())
+            // @tswow-begin: route stock boss access through the generic module hook
+            if (!instance->CheckRequiredBossesWithScripts(DATA_THE_LICH_KING, target->ToPlayer()) || !me->IsVisible())
+            // @tswow-end
             {
                 EnterEvadeMode(EVADE_REASON_OTHER);
                 instance->DoCastSpellOnPlayers(LIGHT_S_HAMMER_TELEPORT);

@@ -312,7 +312,9 @@ void PointMovementGenerator<T>::MovementInform(T* /*unit*/)
 template <> void PointMovementGenerator<Creature>::MovementInform(Creature* unit)
 {
     if (unit->AI())
-        unit->AI()->MovementInform(POINT_MOTION_TYPE, id);
+        // @tswow-begin: route movement completion through generic lifecycle dispatch
+        unit->AI()->NotifyMovementInform(POINT_MOTION_TYPE, id);
+        // @tswow-end
 
     if (Unit* summoner = unit->GetCharmerOrOwner())
     {
@@ -378,5 +380,7 @@ void EffectMovementGenerator::Finalize(Unit* unit)
     //}
 
     if (unit->ToCreature()->AI())
-        unit->ToCreature()->AI()->MovementInform(EFFECT_MOTION_TYPE, m_Id);
+        // @tswow-begin: route movement completion through generic lifecycle dispatch
+        unit->ToCreature()->AI()->NotifyMovementInform(EFFECT_MOTION_TYPE, m_Id);
+        // @tswow-end
 }

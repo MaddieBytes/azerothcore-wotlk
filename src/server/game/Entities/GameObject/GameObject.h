@@ -302,7 +302,9 @@ public:
         return GO_DESTRUCTIBLE_INTACT;
     }
 
-    void EventInform(uint32 eventId);
+    // @tswow-begin: preserve the invoker for generic battleground events
+    void EventInform(uint32 eventId, WorldObject* invoker = nullptr);
+    // @tswow-end
 
     [[nodiscard]] virtual uint32 GetScriptId() const;
     [[nodiscard]] GameObjectAI* AI() const { return m_AI; }

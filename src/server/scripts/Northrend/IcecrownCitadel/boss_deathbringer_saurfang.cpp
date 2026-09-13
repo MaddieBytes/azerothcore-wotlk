@@ -281,7 +281,9 @@ public:
             me->RemoveAurasDueToSpell(SPELL_BLOOD_POWER);
             DoCast(me, SPELL_BLOOD_POWER, true);
 
-            if (!instance->CheckRequiredBosses(DATA_DEATHBRINGER_SAURFANG, who->ToPlayer()))
+            // @tswow-begin: route stock boss access through the generic module hook
+            if (!instance->CheckRequiredBossesWithScripts(DATA_DEATHBRINGER_SAURFANG, who->ToPlayer()))
+            // @tswow-end
             {
                 EnterEvadeMode(EVADE_REASON_OTHER);
                 instance->DoCastSpellOnPlayers(LIGHT_S_HAMMER_TELEPORT);

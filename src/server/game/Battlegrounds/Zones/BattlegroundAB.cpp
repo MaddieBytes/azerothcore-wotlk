@@ -20,6 +20,9 @@
 #include "Creature.h"
 #include "GameGraveyard.h"
 #include "Player.h"
+// @tswow-begin: battleground objective action dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "Util.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -304,6 +307,9 @@ void BattlegroundAB::NodeDeoccupied(uint8 node)
 
 void BattlegroundAB::EventPlayerClickedOnFlag(Player* player, GameObject* gameObject)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::ClickFlag, player, gameObject);
+    // @tswow-end
     if (GetStatus() != STATUS_IN_PROGRESS || !player->IsWithinDistInMap(gameObject, 10.0f))
         return;
 

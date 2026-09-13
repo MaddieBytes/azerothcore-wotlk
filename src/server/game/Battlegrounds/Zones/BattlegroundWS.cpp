@@ -22,6 +22,9 @@
 #include "Object.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+// @tswow-begin: battleground objective action dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldStateDefines.h"
@@ -237,6 +240,9 @@ void BattlegroundWS::EventPlayerCapturedFlag(Player* player)
 
 void BattlegroundWS::EventPlayerDroppedFlag(Player* player)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::DropFlag, player);
+    // @tswow-end
     if (GetFlagPickerGUID(TEAM_HORDE) != player->GetGUID() && GetFlagPickerGUID(TEAM_ALLIANCE) != player->GetGUID())
         return;
 
@@ -267,6 +273,9 @@ void BattlegroundWS::EventPlayerDroppedFlag(Player* player)
 
 void BattlegroundWS::EventPlayerClickedOnFlag(Player* player, GameObject* gameObject)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::ClickFlag, player, gameObject);
+    // @tswow-end
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
 

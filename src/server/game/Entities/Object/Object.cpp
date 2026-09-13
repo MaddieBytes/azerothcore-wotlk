@@ -1204,9 +1204,22 @@ void WorldObject::ProcessPositionDataChanged(PositionFullTerrainStatus const& da
         if (area->zone)
             _zoneId = area->zone;
 
-    _outdoors   = data.outdoors;
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    bool outdoors = data.outdoors;
+    uint32 liquidStatus = data.liquidInfo.Status;
+    if ((IsUnit() || IsPlayer()) && _outdoors != outdoors)
+        sScriptMgr->OnUnitLifecycle(ToUnit(), UnitLifecycleEvent::OutdoorsChanged, nullptr, nullptr,
+            nullptr, nullptr, nullptr, &outdoors);
+    if ((IsUnit() || IsPlayer()) && _liquidData.Status != data.liquidInfo.Status)
+        sScriptMgr->OnUnitLifecycle(ToUnit(), UnitLifecycleEvent::LiquidStatusChanged, nullptr, nullptr,
+            nullptr, nullptr, &liquidStatus);
+    // @tswow-end
+    _outdoors   = outdoors;
     _floorZ     = data.floorZ;
     _liquidData = data.liquidInfo;
+    // @tswow-begin: generic unit calculation and lifecycle dispatch
+    _liquidData.Status = static_cast<LiquidStatus>(liquidStatus);
+    // @tswow-end
 
     // Has zone ID changed?
     if (oldZoneId != _zoneId)
@@ -3615,6 +3628,10 @@ SpellMissInfo WorldObject::MagicSpellHitResult(Unit* victim, SpellInfo const* sp
             HitChance += int32(unitCaster->m_modSpellHitChance * 100.0f);
     }
 
+    // @tswow-begin: mutable spell hit chance
+    sScriptMgr->OnSpellCalculation(spellInfo, SpellCalculationEvent::Hit, this, victim,
+        nullptr, nullptr, &HitChance);
+    // @tswow-end
     if (HitChance < 100)
         HitChance = 100;
     else if (HitChance > 10000)
@@ -3628,8 +3645,8 @@ SpellMissInfo WorldObject::MagicSpellHitResult(Unit* victim, SpellInfo const* sp
         return SPELL_MISS_MISS;
 
     // Chance resist mechanic (select max value from every mechanic spell effect)
+    // @tswow-begin: mutable spell resistance chance
     int32 resist_chance = victim->GetMechanicResistChance(spellInfo) * 100;
-    tmp += resist_chance;
 
     // Chance resist debuff
     if (!spellInfo->IsPositive() && !spellInfo->HasAttribute(SPELL_ATTR4_NO_CAST_LOG))
@@ -3647,13 +3664,18 @@ SpellMissInfo WorldObject::MagicSpellHitResult(Unit* victim, SpellInfo const* sp
 
         if (bNegativeAura)
         {
-            tmp += victim->GetMaxPositiveAuraModifierByMiscValue(SPELL_AURA_MOD_DEBUFF_RESISTANCE, int32(spellInfo->Dispel)) * 100;
-            tmp += victim->GetMaxNegativeAuraModifierByMiscValue(SPELL_AURA_MOD_DEBUFF_RESISTANCE, int32(spellInfo->Dispel)) * 100;
+            resist_chance += victim->GetMaxPositiveAuraModifierByMiscValue(SPELL_AURA_MOD_DEBUFF_RESISTANCE, int32(spellInfo->Dispel)) * 100;
+            resist_chance += victim->GetMaxNegativeAuraModifierByMiscValue(SPELL_AURA_MOD_DEBUFF_RESISTANCE, int32(spellInfo->Dispel)) * 100;
         }
 
         if (spellInfo->HasAttribute(SPELL_ATTR0_CU_BINARY_SPELL) && (spellInfo->GetSchoolMask() & (SPELL_SCHOOL_MASK_NORMAL | SPELL_SCHOOL_MASK_HOLY)) == 0)
-            tmp += int32(Unit::GetEffectiveResistChance(unitCaster, spellInfo->GetSchoolMask(), victim, spellInfo) * 10000.0f);
+            resist_chance += int32(Unit::GetEffectiveResistChance(unitCaster, spellInfo->GetSchoolMask(), victim, spellInfo) * 10000.0f);
     }
+
+    sScriptMgr->OnSpellCalculation(spellInfo, SpellCalculationEvent::Resist, this, victim,
+        nullptr, nullptr, &resist_chance);
+    tmp += resist_chance;
+    // @tswow-end
 
     // Roll chance
     if (rand < tmp)
@@ -3707,6 +3729,11 @@ SpellMissInfo WorldObject::SpellHitResult(Unit* victim, SpellInfo const* spell, 
     {
         int32 reflectchance = victim->GetTotalAuraModifier(SPELL_AURA_REFLECT_SPELLS);
         reflectchance += victim->GetTotalAuraModifierByMiscMask(SPELL_AURA_REFLECT_SPELLS_SCHOOL, spell->GetSchoolMask());
+
+        // @tswow-begin: mutable spell reflection chance
+        sScriptMgr->OnSpellCalculation(spell, SpellCalculationEvent::Reflect, this, victim,
+            nullptr, nullptr, &reflectchance);
+        // @tswow-end
 
         if (reflectchance > 0 && roll_chance_i(reflectchance))
         {
@@ -3786,6 +3813,11 @@ SpellMissInfo WorldObject::SpellHitResult(Unit* victim, Spell const* spell, bool
     {
         int32 reflectchance = victim->GetTotalAuraModifier(SPELL_AURA_REFLECT_SPELLS);
         reflectchance += victim->GetTotalAuraModifierByMiscMask(SPELL_AURA_REFLECT_SPELLS_SCHOOL, spellInfo->GetSchoolMask());
+
+        // @tswow-begin: mutable spell reflection chance
+        sScriptMgr->OnSpellCalculation(spellInfo, SpellCalculationEvent::Reflect, this, victim,
+            const_cast<Spell*>(spell), nullptr, &reflectchance);
+        // @tswow-end
 
         if (reflectchance > 0 && roll_chance_i(reflectchance))
         {

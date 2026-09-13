@@ -2461,6 +2461,12 @@ void Spell::AddUnitTarget(Unit* target, uint32 effectMask, bool checkIfValid /*=
     if (m_originalCaster)
     {
         targetInfo.missCondition = m_originalCaster->SpellHitResult(target, this, m_canReflect);
+        // @tswow-begin: mutable per-target spell miss result
+        uint32 missCondition = targetInfo.missCondition;
+        sScriptMgr->OnSpellCalculation(m_spellInfo, SpellCalculationEvent::Miss, m_originalCaster,
+            target, this, nullptr, nullptr, &missCondition, &effectMask);
+        targetInfo.missCondition = static_cast<SpellMissInfo>(missCondition);
+        // @tswow-end
         if (m_skipCheck && targetInfo.missCondition != SPELL_MISS_IMMUNE)
         {
             targetInfo.missCondition = SPELL_MISS_NONE;
@@ -2900,10 +2906,16 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
                 if (unitCaster && unitCaster->GetEntry() == 27893)
                 {
                     if (Unit* owner = unitCaster->GetOwner())
-                        owner->CalculateSpellDamageTaken(&damageInfo, m_damage, m_spellInfo, m_attackType,  target->crit);
+                        // @tswow-begin: retain active spell context for generic damage lifecycle hooks
+                        owner->CalculateSpellDamageTaken(&damageInfo, m_damage, m_spellInfo, m_attackType,
+                            target->crit, this, target->effectMask);
+                        // @tswow-end
                 }
                 else
-                    caster->CalculateSpellDamageTaken(&damageInfo, m_damage, m_spellInfo, m_attackType,  target->crit);
+                    // @tswow-begin: retain active spell context for generic damage lifecycle hooks
+                    caster->CalculateSpellDamageTaken(&damageInfo, m_damage, m_spellInfo, m_attackType,
+                        target->crit, this, target->effectMask);
+                    // @tswow-end
 
                 // xinef: override miss info after absorb / block calculations
                 if (missInfo == SPELL_MISS_NONE && damageInfo.damage == 0)
@@ -3060,6 +3072,14 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
 
     if (spellHitTarget)
     {
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        if (Creature* targetCreature = spellHitTarget->ToCreature())
+            sScriptMgr->OnCreatureLifecycle(targetCreature, CreatureLifecycleEvent::HitBySpell, m_caster,
+                nullptr, 0, 0, false, m_spellInfo);
+        if (Creature* casterCreature = m_caster->ToCreature())
+            sScriptMgr->OnCreatureLifecycle(casterCreature, CreatureLifecycleEvent::SpellHitTarget,
+                spellHitTarget, nullptr, 0, 0, false, m_spellInfo);
+        // @tswow-end
         //AI functions
         if (spellHitTarget->IsCreature())
         {
@@ -3878,6 +3898,9 @@ void Spell::cancel(bool bySelf)
     m_spellState = oldState;
 
     sScriptMgr->OnSpellCastCancel(this, unitCaster, m_spellInfo, bySelf);
+    // @tswow-begin: generic spell script lifecycle dispatch
+    sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::Cancel, oldState);
+    // @tswow-end
 
     finish(false);
 }
@@ -3943,7 +3966,13 @@ void Spell::_cast(bool skipCheck)
                 for (Unit::ControlSet::iterator itr = playerCaster->m_Controlled.begin(); itr != playerCaster->m_Controlled.end(); ++itr)
                     if (Unit* pet = *itr)
                         if (pet->IsAlive() && pet->IsCreature())
+                        // @tswow-begin: generic creature AI lifecycle dispatch
+                        {
+                            sScriptMgr->OnCreatureLifecycle(pet->ToCreature(), CreatureLifecycleEvent::OwnerAttacks,
+                                m_targets.GetUnitTarget());
                             pet->ToCreature()->AI()->OwnerAttacked(m_targets.GetUnitTarget());
+                        }
+                        // @tswow-end
     }
 
     SetExecutedCurrently(true);
@@ -4199,6 +4228,12 @@ void Spell::_cast(bool skipCheck)
     sScriptMgr->OnSpellCast(this, unitCaster, m_spellInfo, skipCheck);
 
     SetExecutedCurrently(false);
+
+    // @tswow-begin: generic creature spell-finished lifecycle dispatch
+    if (Creature* caster = m_originalCaster->ToCreature())
+        sScriptMgr->OnCreatureLifecycle(caster, CreatureLifecycleEvent::SpellCastFinished,
+            nullptr, nullptr, 0, 0, false, m_spellInfo);
+    // @tswow-end
 
     // Call CreatureAI hook on successful cast
     if (Creature* caster = unitCaster ? unitCaster->ToCreature() : nullptr)
@@ -4577,6 +4612,12 @@ void Spell::update(uint32 difftime)
                     SendChannelUpdate(0);
 
                     finish();
+
+                    // @tswow-begin: generic creature spell-finished lifecycle dispatch
+                    if (Creature* caster = m_originalCaster->ToCreature())
+                        sScriptMgr->OnCreatureLifecycle(caster, CreatureLifecycleEvent::SpellCastFinished,
+                            nullptr, nullptr, 2, 0, false, m_spellInfo);
+                    // @tswow-end
 
                     // We call the hook here instead of in Spell::finish because we only want to call it for completed channeling. Everything else is handled by interrupts
                     if (Creature* creatureCaster = unitCaster ? unitCaster->ToCreature() : nullptr)
@@ -5828,6 +5869,12 @@ void Spell::HandleEffects(Unit* pUnitTarget, Item* pItemTarget, GameObject* pGOT
 
     // we do not need DamageMultiplier here.
     damage = CalculateSpellDamage(i, nullptr);
+
+    // @tswow-begin: cancellable spell effect dispatch before regular SpellScript handlers
+    if (!sScriptMgr->CanHandleSpellEffect(this, &m_spellInfo->Effects[i], static_cast<uint32>(mode),
+        pUnitTarget, pItemTarget, pGOTarget, m_targets.GetCorpseTarget()))
+        return;
+    // @tswow-end
 
     bool preventDefault = CallScriptEffectHandlers((SpellEffIndex)i, mode);
 
@@ -8691,6 +8738,10 @@ void Spell::DoAllEffectOnLaunchTarget(TargetInfo& targetInfo, float* multiplier)
     {
         float critChance = caster->SpellDoneCritChance(unit, m_spellInfo, m_spellSchoolMask, m_attackType, false);
         critChance = unit->SpellTakenCritChance(caster, m_spellInfo, m_spellSchoolMask, critChance, m_attackType, false);
+        // @tswow-begin: mutable spell critical-chance dispatch
+        sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::CalcCrit, 0, nullptr, nullptr,
+            nullptr, &critChance);
+        // @tswow-end
         targetInfo.crit = roll_chance_f(std::max(0.0f, critChance));
     }
 }
@@ -8867,6 +8918,10 @@ void Spell::LoadScripts()
 
 void Spell::CallScriptBeforeCastHandlers()
 {
+    // @tswow-begin: generic spell script lifecycle dispatch
+    if (!sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::BeforeCast))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_BEFORE_CAST);
@@ -8893,6 +8948,10 @@ void Spell::CallScriptOnCastHandlers()
 
 void Spell::CallScriptAfterCastHandlers()
 {
+    // @tswow-begin: generic spell script lifecycle dispatch
+    if (!sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::AfterCast))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_AFTER_CAST);
@@ -8979,6 +9038,10 @@ bool Spell::CallScriptEffectHandlers(SpellEffIndex effIndex, SpellEffectHandleMo
 
 void Spell::CallScriptBeforeHitHandlers(SpellMissInfo missInfo)
 {
+    // @tswow-begin: generic spell script lifecycle dispatch
+    if (!sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::BeforeHit, missInfo))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_BEFORE_HIT);
@@ -8992,6 +9055,9 @@ void Spell::CallScriptBeforeHitHandlers(SpellMissInfo missInfo)
 
 void Spell::CallScriptOnHitHandlers()
 {
+    // @tswow-begin: generic spell script lifecycle dispatch
+    sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::Hit);
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_HIT);
@@ -9005,6 +9071,10 @@ void Spell::CallScriptOnHitHandlers()
 
 void Spell::CallScriptAfterHitHandlers()
 {
+    // @tswow-begin: generic spell script lifecycle dispatch
+    if (!sScriptMgr->OnSpellLifecycle(this, SpellLifecycleEvent::AfterHit))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_AFTER_HIT);
@@ -9018,6 +9088,10 @@ void Spell::CallScriptAfterHitHandlers()
 
 void Spell::CallScriptObjectAreaTargetSelectHandlers(std::list<WorldObject*>& targets, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType)
 {
+    // @tswow-begin: cancellable global spell area-target selection
+    if (!sScriptMgr->CanSelectSpellObjectAreaTarget(this, targets, effIndex, targetType))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_OBJECT_AREA_TARGET_SELECT);
@@ -9032,6 +9106,10 @@ void Spell::CallScriptObjectAreaTargetSelectHandlers(std::list<WorldObject*>& ta
 
 void Spell::CallScriptObjectTargetSelectHandlers(WorldObject*& target, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType)
 {
+    // @tswow-begin: cancellable global spell object-target selection
+    if (!sScriptMgr->CanSelectSpellObjectTarget(this, target, effIndex, targetType))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_OBJECT_TARGET_SELECT);
@@ -9046,6 +9124,10 @@ void Spell::CallScriptObjectTargetSelectHandlers(WorldObject*& target, SpellEffI
 
 void Spell::CallScriptDestinationTargetSelectHandlers(SpellDestination& target, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType)
 {
+    // @tswow-begin: cancellable global spell destination-target selection
+    if (!sScriptMgr->CanSelectSpellDestinationTarget(this, target, effIndex, targetType))
+        return;
+    // @tswow-end
     for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
     {
         (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_DESTINATION_TARGET_SELECT);

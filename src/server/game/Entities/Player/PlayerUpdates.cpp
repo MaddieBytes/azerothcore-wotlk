@@ -751,17 +751,24 @@ bool Player::UpdateSkill(uint32 skill_id, uint32 step)
 }
 
 // iraizo: turn this into a switch statement
-inline int SkillGainChance(uint32 SkillValue, uint32 GrayLevel,
+// @tswow-begin: contextual mutable skill-gain formula dispatch
+inline int SkillGainChance(Player* player, uint32 skillId, uint32 SkillValue, uint32 GrayLevel,
                            uint32 GreenLevel, uint32 YellowLevel)
 {
+    int32 chance;
     if (SkillValue >= GrayLevel)
-        return sWorld->getIntConfig(CONFIG_SKILL_CHANCE_GREY) * 10;
-    if (SkillValue >= GreenLevel)
-        return sWorld->getIntConfig(CONFIG_SKILL_CHANCE_GREEN) * 10;
-    if (SkillValue >= YellowLevel)
-        return sWorld->getIntConfig(CONFIG_SKILL_CHANCE_YELLOW) * 10;
-    return sWorld->getIntConfig(CONFIG_SKILL_CHANCE_ORANGE) * 10;
+        chance = sWorld->getIntConfig(CONFIG_SKILL_CHANCE_GREY) * 10;
+    else if (SkillValue >= GreenLevel)
+        chance = sWorld->getIntConfig(CONFIG_SKILL_CHANCE_GREEN) * 10;
+    else if (SkillValue >= YellowLevel)
+        chance = sWorld->getIntConfig(CONFIG_SKILL_CHANCE_YELLOW) * 10;
+    else
+        chance = sWorld->getIntConfig(CONFIG_SKILL_CHANCE_ORANGE) * 10;
+    sScriptMgr->OnPlayerFormulaCalculation(player, PlayerFormulaEvent::SkillGainChance,
+        nullptr, nullptr, &chance, skillId, SkillValue, GrayLevel, GreenLevel, YellowLevel);
+    return chance;
 }
+// @tswow-end
 
 inline int32 CraftSkillGainChance(uint32 skillValue, uint32 grayLevel, uint32 yellowLevel)
 {
@@ -805,14 +812,14 @@ bool Player::UpdateGatherSkill(uint32 SkillId, uint32 SkillValue,
     case SKILL_JEWELCRAFTING:
     case SKILL_INSCRIPTION:
         return UpdateSkillPro(SkillId,
-                              SkillGainChance(SkillValue, RedLevel + 100,
+                              SkillGainChance(this, SkillId, SkillValue, RedLevel + 100,
                                               RedLevel + 50, RedLevel + 25) *
                                   Multiplicator,
                               gathering_skill_gain);
     case SKILL_SKINNING:
         if (sWorld->getIntConfig(CONFIG_SKILL_CHANCE_SKINNING_STEPS) == 0)
             return UpdateSkillPro(SkillId,
-                                  SkillGainChance(SkillValue, RedLevel + 100,
+                                  SkillGainChance(this, SkillId, SkillValue, RedLevel + 100,
                                                   RedLevel + 50,
                                                   RedLevel + 25) *
                                       Multiplicator,
@@ -820,7 +827,7 @@ bool Player::UpdateGatherSkill(uint32 SkillId, uint32 SkillValue,
         else
             return UpdateSkillPro(
                 SkillId,
-                (SkillGainChance(SkillValue, RedLevel + 100, RedLevel + 50,
+                (SkillGainChance(this, SkillId, SkillValue, RedLevel + 100, RedLevel + 50,
                                  RedLevel + 25) *
                  Multiplicator) >>
                     (SkillValue /
@@ -829,7 +836,7 @@ bool Player::UpdateGatherSkill(uint32 SkillId, uint32 SkillValue,
     case SKILL_MINING:
         if (sWorld->getIntConfig(CONFIG_SKILL_CHANCE_MINING_STEPS) == 0)
             return UpdateSkillPro(SkillId,
-                                  SkillGainChance(SkillValue, RedLevel + 100,
+                                  SkillGainChance(this, SkillId, SkillValue, RedLevel + 100,
                                                   RedLevel + 50,
                                                   RedLevel + 25) *
                                       Multiplicator,
@@ -837,7 +844,7 @@ bool Player::UpdateGatherSkill(uint32 SkillId, uint32 SkillValue,
         else
             return UpdateSkillPro(
                 SkillId,
-                (SkillGainChance(SkillValue, RedLevel + 100, RedLevel + 50,
+                (SkillGainChance(this, SkillId, SkillValue, RedLevel + 100, RedLevel + 50,
                                  RedLevel + 25) *
                  Multiplicator) >>
                     (SkillValue /
@@ -1064,7 +1071,9 @@ void Player::UpdateCombatSkills(Unit* victim, WeaponAttackType attType, bool def
         return;
     }
 
-    uint8 greylevel = Acore::XP::GetGrayLevel(playerLevel);
+    // @tswow-begin: contextual gray-level formula dispatch
+    uint8 greylevel = Acore::XP::GetGrayLevel(this, playerLevel);
+    // @tswow-end
     uint8 moblevel = defence ? victim->getLevelForTarget(this) : victim->GetLevel(); // if defense than victim == attacker
     /*if (moblevel < greylevel)
         return;*/

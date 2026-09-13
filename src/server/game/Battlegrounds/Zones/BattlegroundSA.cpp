@@ -23,6 +23,9 @@
 #include "Language.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+// @tswow-begin: battleground objective action dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "WorldPacket.h"
 #include "WorldSession.h"
 
@@ -749,6 +752,9 @@ void BattlegroundSA::DemolisherStartState(bool start)
 
 void BattlegroundSA::DestroyGate(Player* player, GameObject* go)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::DestroyGate, player, go);
+    // @tswow-end
     uint32 i = GetGateIDFromEntry(go->GetEntry());
     if (!GateStatus[i])
         return;
@@ -892,6 +898,9 @@ void BattlegroundSA::UpdateObjectInteractionFlags()
 
 void BattlegroundSA::EventPlayerClickedOnFlag(Player* Source, GameObject* gameObject)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::ClickFlag, Source, gameObject);
+    // @tswow-end
     switch (gameObject->GetEntry())
     {
         case 191307:

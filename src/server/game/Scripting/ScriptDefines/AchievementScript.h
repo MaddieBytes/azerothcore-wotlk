@@ -30,6 +30,9 @@ enum AchievementHook
     ACHIEVEMENTHOOK_IS_REALM_COMPLETED,
     ACHIEVEMENTHOOK_ON_BEFORE_CHECK_CRITERIA,
     ACHIEVEMENTHOOK_CAN_CHECK_CRITERIA,
+    // @tswow-begin: achievement progress update dispatch
+    ACHIEVEMENTHOOK_ON_CRITERIA_PROGRESS,
+    // @tswow-end
     ACHIEVEMENTHOOK_END
 };
 
@@ -51,6 +54,12 @@ public:
     virtual void OnBeforeCheckCriteria(AchievementMgr* /*mgr*/, std::list<AchievementCriteriaEntry const*> const* /*achievementCriteriaList*/) { }
 
     [[nodiscard]] virtual bool CanCheckCriteria(AchievementMgr* /*mgr*/, AchievementCriteriaEntry const* /*achievementCriteria*/) { return true; }
+
+    // @tswow-begin: achievement progress update dispatch
+    virtual void OnCriteriaProgress(Player* /*player*/, AchievementEntry const* /*achievement*/,
+        AchievementCriteriaEntry const* /*criteria*/, uint32 /*progressType*/, uint32 /*timeElapsed*/,
+        bool /*timedCompleted*/) { }
+    // @tswow-end
 };
 
 #endif

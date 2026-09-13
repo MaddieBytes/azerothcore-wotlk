@@ -232,6 +232,9 @@ Player::Player(WorldSession* session): Unit(), m_mover(this), _cinematicMgr(*thi
     m_trade = nullptr;
 
     m_cinematic = 0;
+    // @tswow-begin: retain the active movie for completion callbacks
+    m_movie = 0;
+    // @tswow-end
 
     PlayerTalkClass = new PlayerMenu(GetSession());
     m_currentBuybackSlot = BUYBACK_SLOT_START;
@@ -425,6 +428,14 @@ Player::Player(WorldSession* session): Unit(), m_mover(this), _cinematicMgr(*thi
     _pendingFlightChangeCounter = 0;
     _mapChangeOrderCounter = 0;
 }
+
+// @tswow-begin: generic unit target lifecycle dispatch
+void Player::SetTarget(ObjectGuid guid)
+{
+    sScriptMgr->OnUnitLifecycle(this, UnitLifecycleEvent::SetTarget, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, guid.GetRawValue(), 0);
+}
+// @tswow-end
 
 Player::~Player()
 {
@@ -3156,10 +3167,24 @@ bool Player::addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool
     if (!_addSpell(spellId, addSpecMask, temporary, learnFromSkill))
         return false;
 
-    if (!updateActive)
-        return true;
-
     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId); // must exist, checked in _addSpell
+    // @tswow-begin: generic player spell-learn dispatch
+    auto fireLearn = [&](bool superseded)
+    {
+        PlayerSpell* learned = m_spells.at(spellId);
+        bool const active = learned->Active;
+        bool const disabled = !learned->IsInSpec(m_activeSpec);
+        sScriptMgr->OnSpellLearn(spellInfo, this, active, disabled, superseded, learnFromSkill ? 1 : 0);
+    };
+    // @tswow-end
+
+    if (!updateActive)
+    {
+        // @tswow-begin: generic player spell-learn dispatch
+        fireLearn(false);
+        // @tswow-end
+        return true;
+    }
 
     // pussywizard: now update active state for all ranks of this spell! and send packet to swap on action bar
     // pussywizard: assumption - it's in all specs, can't be a talent
@@ -3185,6 +3210,9 @@ bool Player::addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool
                         data << uint32(spellInfo->Id);
                         SendDirectMessage(&data);
                     }
+                    // @tswow-begin: generic player spell-learn dispatch
+                    fireLearn(true);
+                    // @tswow-end
                     return false;
                 }
                 else if (nextSpellInfo->GetRank() > spellInfo->GetRank())
@@ -3196,6 +3224,9 @@ bool Player::addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool
                     if (!isBeingLoaded() && IsUnlearnNeededForSpell(spellId))
                         SendUnlearnSpells();
 
+                    // @tswow-begin: generic player spell-learn dispatch
+                    fireLearn(true);
+                    // @tswow-end
                     return false;
                 }
             }
@@ -3206,6 +3237,9 @@ bool Player::addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool
     if (!isBeingLoaded() && IsUnlearnNeededForSpell(spellId))
         SendUnlearnSpells();
 
+    // @tswow-begin: generic player spell-learn dispatch
+    fireLearn(false);
+    // @tswow-end
     return true;
 }
 
@@ -3652,6 +3686,11 @@ void Player::removeSpell(uint32 spell_id, uint8 removeSpecMask, bool onlyTempora
         sScriptMgr->OnPlayerForgotSpell(this, spell_id);
         SendLearnPacket(spell_id, false);
     }
+
+    // @tswow-begin: generic player spell-unlearn dispatch
+    bool const disabled = m_spells.contains(spell_id) && m_spells.at(spell_id)->specMask != 0;
+    sScriptMgr->OnSpellUnlearn(spellInfo, this, disabled, false);
+    // @tswow-end
 }
 
 bool Player::Has310Flyer(bool checkAllSpells, uint32 excludeSpellId)
@@ -3875,6 +3914,9 @@ uint32 Player::resetTalentsCost() const
 
 bool Player::resetTalents(bool noResetCost)
 {
+    // @tswow-begin: exact talent lifecycle hooks
+    sScriptMgr->OnPlayerBeforeTalentsReset(this, noResetCost);
+    // @tswow-end
     sScriptMgr->OnPlayerTalentsReset(this, noResetCost);
 
     // xinef: remove at login flag upon talents reset
@@ -3922,6 +3964,19 @@ bool Player::resetTalents(bool noResetCost)
         TalentEntry const* talentInfo = sTalentStore.LookupEntry(itr->second->talentID);
         SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(itr->first);
 
+        // @tswow-begin: generic talent-unlearn dispatch
+        TalentTabEntry const* talentTab = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
+        if (talentTab)
+        {
+            sScriptMgr->OnSpellUnlearnTalent(spellInfo, this, talentTab->tabpage,
+                talentInfo->Row, talentInfo->Col, spellInfo->GetRank() - 1, true);
+            for (SpellEffectInfo const& effect : spellInfo->Effects)
+                if (effect.Effect == SPELL_EFFECT_LEARN_SPELL && effect.TriggerSpell)
+                    sScriptMgr->OnSpellUnlearnTalent(spellInfo, this, talentTab->tabpage,
+                        talentInfo->Row, talentInfo->Col, spellInfo->GetRank() - 1, false);
+        }
+        // @tswow-end
+
         bool removed = false;
         if (talentInfo->addToSpellBook)
             if (!spellInfo->HasAttribute(SPELL_ATTR0_PASSIVE) && !spellInfo->HasEffect(SPELL_EFFECT_LEARN_SPELL))
@@ -3965,6 +4020,9 @@ bool Player::resetTalents(bool noResetCost)
         m_resetTalentsTime = GameTime::GetGameTime().count();
     }
 
+    // @tswow-begin: exact talent lifecycle hooks
+    sScriptMgr->OnPlayerAfterTalentsReset(this, noResetCost);
+    // @tswow-end
     return true;
 }
 
@@ -5875,6 +5933,9 @@ void Player::SendCinematicStart(uint32 CinematicSequenceId) const
 
 void Player::SendMovieStart(uint32 MovieId)
 {
+    // @tswow-begin: retain the active movie for completion callbacks
+    m_movie = MovieId;
+    // @tswow-end
     WorldPacket data(SMSG_TRIGGER_MOVIE, 4);
     data << uint32(MovieId);
     SendDirectMessage(&data);
@@ -6068,7 +6129,9 @@ float Player::CalculateReputationGain(ReputationSource source, uint32 creatureOr
             break;
     }
 
-    if (rate != 1.0f && creatureOrQuestLevel <= Acore::XP::GetGrayLevel(GetLevel()))
+    // @tswow-begin: contextual gray-level formula dispatch
+    if (rate != 1.0f && creatureOrQuestLevel <= Acore::XP::GetGrayLevel(this, GetLevel()))
+    // @tswow-end
         percent *= rate;
 
     if (percent <= 0.0f)
@@ -6320,7 +6383,9 @@ bool Player::RewardHonor(Unit* uVictim, uint32 groupsize, int32 honor, bool awar
                 return false;
 
             uint8 k_level = GetLevel();
-            uint8 k_grey = Acore::XP::GetGrayLevel(k_level);
+            // @tswow-begin: contextual gray-level formula dispatch
+            uint8 k_grey = Acore::XP::GetGrayLevel(this, k_level);
+            // @tswow-end
             uint8 v_level = victim->GetLevel();
 
             if (v_level <= k_grey)
@@ -8056,6 +8121,10 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                 loot->FillLoot(lootid, LootTemplates_Gameobject, this, !groupRules, false, go->GetLootMode(), go);
                 go->SetLootGenerationTime();
 
+                // @tswow-begin: generic game-object loot notification
+                sScriptMgr->OnGameObjectGenerateLoot(go, this);
+                // @tswow-end
+
                 // get next RR player (for next loot)
                 if (groupRules && !go->loot.empty())
                     group->UpdateLooterGuid(go);
@@ -8169,6 +8238,10 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
 
                     break;
             }
+            // @tswow-begin: item loot generation lifecycle dispatch
+            sScriptMgr->OnPlayerLootLifecycle(this, PlayerLootLifecycleEvent::GenerateItemLoot,
+                item, loot, nullptr, nullptr, loot_type);
+            // @tswow-end
         }
     }
     else if (guid.IsCorpse())                          // remove insignia
@@ -8199,6 +8272,10 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
             permission = NONE_PERMISSION;
         else
             permission = OWNER_PERMISSION;
+        // @tswow-begin: player corpse loot lifecycle dispatch
+        sScriptMgr->OnPlayerLootLifecycle(this, PlayerLootLifecycleEvent::LootCorpse,
+            nullptr, loot, bones);
+        // @tswow-end
     }
     else
     {
@@ -8223,7 +8300,12 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
         {
             if (!loot || loot->loot_type != LOOT_PICKPOCKETING)
             {
-                if (creature->CanGeneratePickPocketLoot())
+                bool canGenerate = creature->CanGeneratePickPocketLoot();
+                // @tswow-begin: mutable pickpocket availability dispatch
+                sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::CanGeneratePickPocketLoot,
+                    this, nullptr, 0, 0, false, nullptr, nullptr, nullptr, &canGenerate);
+                // @tswow-end
+                if (canGenerate)
                 {
                     creature->SetPickPocketLootTime();
                     loot->clear();
@@ -8235,6 +8317,10 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                     const uint32 a = urand(0, creature->GetLevel() / 2);
                     const uint32 b = urand(0, GetLevel() / 2);
                     loot->gold = uint32(10 * (a + b) * sWorld->getRate(RATE_DROP_MONEY));
+                    // @tswow-begin: generated pickpocket loot dispatch
+                    sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::GeneratePickPocketLoot,
+                        this, nullptr, 0, 0, false, nullptr, loot);
+                    // @tswow-end
                     permission = OWNER_PERMISSION;
                 }
                 else
@@ -8300,6 +8386,11 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type)
                 {
                     mapInstance->CreatureLooted(creature, LOOT_SKINNING);
                 }
+
+                // @tswow-begin: generated skinning loot dispatch
+                sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::GenerateSkinningLoot,
+                    this, nullptr, 0, 0, false, nullptr, loot);
+                // @tswow-end
 
                 // Xinef: Set new loot recipient
                 creature->SetLootRecipient(this, false);
@@ -9061,6 +9152,11 @@ void Player::SendInitWorldStates(uint32 zoneId, uint32 areaId)
     }
 
     sWorldState->FillInitialWorldStates(packet, zoneId, areaId);
+    // @tswow-begin: generic initial instance world-state dispatch
+    if (InstanceMap* instanceMap = GetMap()->ToInstanceMap())
+        if (InstanceScript* instance = instanceMap->GetInstanceScript())
+            sScriptMgr->OnInstanceFillInitialWorldStates(instanceMap, instance, packet);
+    // @tswow-end
     SendDirectMessage(packet.Write());
     SendBGWeekendWorldStates();
     SendBattlefieldWorldStates();
@@ -11706,6 +11802,9 @@ bool Player::ModifyMoney(int32 amount, bool sendError /*= true*/)
         {
             if (GetSession()->IsTrialAccount() && GetMoney() + uint32(amount) > trialMoneyCap)
             {
+                // @tswow-begin: notify modules when a player reaches a configured money cap
+                sScriptMgr->OnPlayerMoneyLimit(this, amount);
+                // @tswow-end
                 if (sendError)
                     SendEquipError(EQUIP_ERR_TOO_MUCH_GOLD, nullptr, nullptr);
                 return false;
@@ -11716,6 +11815,9 @@ bool Player::ModifyMoney(int32 amount, bool sendError /*= true*/)
             SetMoney(GetMoney() + amount);
         else
         {
+            // @tswow-begin: notify modules when a player reaches a configured money cap
+            sScriptMgr->OnPlayerMoneyLimit(this, amount);
+            // @tswow-end
             if (sendError)
                 SendEquipError(EQUIP_ERR_TOO_MUCH_GOLD, nullptr, nullptr);
             return false;
@@ -12966,7 +13068,9 @@ uint32 Player::GetResurrectionSpellId()
 bool Player::isHonorOrXPTarget(Unit* victim) const
 {
     uint8 v_level = victim->GetLevel();
-    uint8 k_grey  = Acore::XP::GetGrayLevel(GetLevel());
+    // @tswow-begin: contextual gray-level formula dispatch
+    uint8 k_grey  = Acore::XP::GetGrayLevel(const_cast<Player*>(this), GetLevel());
+    // @tswow-end
 
     // Victim level less gray level
     if (v_level <= k_grey)
@@ -13624,6 +13728,9 @@ void Player::InitGlyphsForLevel()
     if (level >= 80)
         value |= 0x20;
 
+    // @tswow-begin: mutable glyph-slot initialization
+    sScriptMgr->OnPlayerUIntStatCalculation(this, PlayerStatCalculation::GlyphSlots, value);
+    // @tswow-end
     SetUInt32Value(PLAYER_GLYPHS_ENABLED, value);
 }
 
@@ -13885,6 +13992,11 @@ LootItem* Player::StoreLootItem(uint8 lootSlot, Loot* loot, InventoryResult& msg
     {
         AllowedLooterSet looters = item->GetAllowedLooters();
         Item* newitem = StoreNewItem(dest, item->itemid, true, item->randomPropertyId, looters);
+        // @tswow-begin: item taken as loot dispatch
+        if (newitem)
+            sScriptMgr->OnPlayerLootLifecycle(this, PlayerLootLifecycleEvent::TakenAsLoot,
+                newitem, loot, nullptr, item);
+        // @tswow-end
 
         if (qitem)
         {
@@ -14372,6 +14484,11 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
     if (!spellInfo)
         return;
+
+    // @tswow-begin: exact cancellable talent-learning hook
+    if (!sScriptMgr->CanPlayerLearnTalentSpell(this, talentInfo, talentRank, spellInfo))
+        return;
+    // @tswow-end
 
     bool learned = false;
 

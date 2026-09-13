@@ -22,6 +22,9 @@
 #include "GameTime.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+// @tswow-begin: battleground objective action dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "Util.h"
 #include "World.h"
 #include "WorldPacket.h"
@@ -409,6 +412,9 @@ void BattlegroundEY::HandleKillPlayer(Player* player, Player* killer)
 
 void BattlegroundEY::EventPlayerDroppedFlag(Player* player)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::DropFlag, player);
+    // @tswow-end
     if (GetFlagPickerGUID() != player->GetGUID())
         return;
 
@@ -431,6 +437,9 @@ void BattlegroundEY::EventPlayerDroppedFlag(Player* player)
 
 void BattlegroundEY::EventPlayerClickedOnFlag(Player* player, GameObject* gameObject)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::ClickFlag, player, gameObject);
+    // @tswow-end
     if (GetStatus() != STATUS_IN_PROGRESS || GetFlagPickerGUID() || !player->IsWithinDistInMap(gameObject, 10.0f))
         return;
 

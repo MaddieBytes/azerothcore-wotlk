@@ -26,6 +26,35 @@
 
 uint32 Acore::XP::BaseGain(uint8 pl_level, uint8 mob_level, ContentLevels content)
 {
+    return BaseGain(nullptr, nullptr, pl_level, mob_level, content);
+}
+
+// @tswow-begin: contextual XP formula hooks without changing upstream signatures
+uint8 Acore::XP::GetGrayLevel(Player* player, uint8 pl_level)
+{
+    uint8 value = GetGrayLevel(pl_level);
+    sScriptMgr->OnPlayerFormulaCalculation(player, PlayerFormulaEvent::GrayLevel, &value);
+    return value;
+}
+
+XPColorChar Acore::XP::GetColorCode(Player* player, Creature* creature, uint8 pl_level, uint8 mob_level)
+{
+    uint32 value = GetColorCode(pl_level, mob_level);
+    sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::CalcColorCode, player,
+        nullptr, pl_level, mob_level, false, nullptr, nullptr, nullptr, nullptr, &value);
+    return static_cast<XPColorChar>(value);
+}
+
+uint8 Acore::XP::GetZeroDifference(Player* player, uint8 pl_level)
+{
+    uint8 value = GetZeroDifference(pl_level);
+    sScriptMgr->OnPlayerFormulaCalculation(player, PlayerFormulaEvent::ZeroDifference, &value);
+    return value;
+}
+
+uint32 Acore::XP::BaseGain(Player* player, Creature* creature, uint8 pl_level, uint8 mob_level,
+    ContentLevels content)
+{
     uint32 baseGain;
     uint32 nBaseExp;
 
@@ -56,19 +85,32 @@ uint32 Acore::XP::BaseGain(uint8 pl_level, uint8 mob_level, ContentLevels conten
     }
     else
     {
-        uint8 gray_level = GetGrayLevel(pl_level);
+        uint8 gray_level = player ? GetGrayLevel(player, pl_level) : GetGrayLevel(pl_level);
         if (mob_level > gray_level)
         {
-            uint8 ZD = GetZeroDifference(pl_level);
+            uint8 ZD = player ? GetZeroDifference(player, pl_level) : GetZeroDifference(pl_level);
             baseGain = (pl_level * 5 + nBaseExp) * (ZD + mob_level - pl_level) / ZD;
         }
         else
             baseGain = 0;
     }
 
+    if (creature)
+        sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::CalcBaseGain, player,
+            nullptr, pl_level, mob_level, false, nullptr, nullptr, nullptr, nullptr, &baseGain);
+
     //sScriptMgr->OnBaseGainCalculation(baseGain, pl_level, mob_level, content); // pussywizard: optimization
     return baseGain;
 }
+
+float Acore::XP::xp_in_group_rate(Player* player, uint32 count, bool isRaid)
+{
+    float value = xp_in_group_rate(count, isRaid);
+    sScriptMgr->OnPlayerFormulaCalculation(player, PlayerFormulaEvent::GroupGain,
+        nullptr, &value, nullptr, count, 0, 0, 0, 0, isRaid);
+    return value;
+}
+// @tswow-end
 
 uint32 Acore::XP::Gain(Player* player, Unit* unit, bool isBattleGround /*= false*/)
 {
@@ -82,7 +124,10 @@ uint32 Acore::XP::Gain(Player* player, Unit* unit, bool isBattleGround /*= false
 
         uint8 playerLevel = player->GetLevel();
         sScriptMgr->OnPlayerBeforeGetLevelForXPGain(player, playerLevel);
-        gain = BaseGain(playerLevel, unit->GetLevel(), GetContentLevelsForMapAndZone(unit->GetMapId(), unit->GetZoneId()));
+        // @tswow-begin: contextual player and creature formula dispatch
+        gain = BaseGain(player, creature, playerLevel, unit->GetLevel(),
+            GetContentLevelsForMapAndZone(unit->GetMapId(), unit->GetZoneId()));
+        // @tswow-end
 
         if (gain && creature)
         {
@@ -131,6 +176,8 @@ uint32 Acore::XP::Gain(Player* player, Unit* unit, bool isBattleGround /*= false
         gain = uint32(gain * xpMod);
     }
 
-    //sScriptMgr->OnGainCalculation(gain, player, u); // pussywizard: optimization
+    // @tswow-begin: enable the existing mutable XP-gain module event
+    sScriptMgr->OnGainCalculation(gain, player, unit);
+    // @tswow-end
     return gain;
 }

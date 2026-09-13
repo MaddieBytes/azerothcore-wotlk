@@ -39,6 +39,13 @@ void ScriptMgr::OnWeatherUpdate(Weather* weather, uint32 diff)
 {
     ASSERT(weather);
 
+    // @tswow-begin: generic weather update event
+    ExecuteScript<ALEScript>([&](ALEScript* script)
+    {
+        script->OnWeatherUpdate(weather, diff);
+    });
+    // @tswow-end
+
     if (auto tempScript = ScriptRegistry<WeatherScript>::GetScriptById(weather->GetScriptId()))
     {
         tempScript->OnUpdate(weather, diff);

@@ -31,6 +31,9 @@ protected:
         BattlegroundScore(playerGuid), PvPTeamId(team == TEAM_ALLIANCE ? PVP_TEAM_ALLIANCE : PVP_TEAM_HORDE) { }
 
     void AppendToPacket(WorldPacket& data) final;
+    // @tswow-begin: reusable base battleground score serialization
+    void AppendBaseToPacket(WorldPacket& data) const final;
+    // @tswow-end
     void BuildObjectivesBlock(WorldPacket& data) final;
 
     // For Logging purpose

@@ -40,6 +40,15 @@ BossBoundaryData::~BossBoundaryData()
         delete it->boundary;
 }
 
+// @tswow-begin: mutable instance boss-count lifecycle hook
+void InstanceScript::SetBossNumber(uint32 number)
+{
+    sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this,
+        InstanceLifecycleEvent::SetBossNumber, nullptr, number, 0, false, &number);
+    bosses.resize(number);
+}
+// @tswow-end
+
 void InstanceScript::SaveToDB()
 {
     if (sToCloud9Sidecar->ClusterModeEnabled() && !sToCloud9Sidecar->IsMapAssigned(instance->GetEntry()->MapID))
@@ -58,6 +67,9 @@ void InstanceScript::SaveToDB()
     stmt->SetData(0, data);
     stmt->SetData(1, instance->GetInstanceId());
     CharacterDatabase.Execute(stmt);
+    // @tswow-begin: generic instance lifecycle dispatch
+    sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this, InstanceLifecycleEvent::Save);
+    // @tswow-end
 }
 
 void InstanceScript::OnPlayerEnter(Player* player)
@@ -158,6 +170,9 @@ void InstanceScript::LoadBossBoundaries(BossBoundaryData const& data)
     for (BossBoundaryEntry const& entry : data)
         if (entry.bossId < bosses.size())
             bosses[entry.bossId].boundary.push_back(entry.boundary);
+    // @tswow-begin: generic instance lifecycle dispatch
+    sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this, InstanceLifecycleEvent::LoadBossBoundaries);
+    // @tswow-end
 }
 
 void InstanceScript::SetHeaders(std::string const& dataHeaders)
@@ -181,6 +196,9 @@ void InstanceScript::LoadMinionData(MinionData const* data)
         ++data;
     }
     LOG_DEBUG("scripts.ai", "InstanceScript::LoadMinionData: {} minions loaded.", uint64(minions.size()));
+    // @tswow-begin: generic instance lifecycle dispatch
+    sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this, InstanceLifecycleEvent::LoadMinionData);
+    // @tswow-end
 }
 
 void InstanceScript::LoadDoorData(DoorData const* data)
@@ -193,6 +211,9 @@ void InstanceScript::LoadDoorData(DoorData const* data)
         ++data;
     }
     LOG_DEBUG("scripts.ai", "InstanceScript::LoadDoorData: {} doors loaded.", uint64(doors.size()));
+    // @tswow-begin: generic instance lifecycle dispatch
+    sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this, InstanceLifecycleEvent::LoadDoorData);
+    // @tswow-end
 }
 
 void InstanceScript::LoadObjectData(ObjectData const* creatureData, ObjectData const* gameObjectData)
@@ -208,6 +229,9 @@ void InstanceScript::LoadObjectData(ObjectData const* creatureData, ObjectData c
     }
 
     LOG_DEBUG("scripts", "InstanceScript::LoadObjectData: {} objects loaded.", _creatureInfo.size() + _gameObjectInfo.size());
+    // @tswow-begin: generic instance lifecycle dispatch
+    sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this, InstanceLifecycleEvent::LoadObjectData);
+    // @tswow-end
 }
 
 void InstanceScript::LoadObjectData(ObjectData const* data, ObjectInfoMap& objectInfo)
@@ -397,6 +421,16 @@ bool InstanceScript::_SkipCheckRequiredBosses(Player const* player /*= nullptr*/
     return player && player->GetSession()->HasPermission(rbac::RBAC_PERM_SKIP_CHECK_INSTANCE_REQUIRED_BOSSES);
 }
 
+// @tswow-begin: preserve virtual overrides while adding a generic mutable boss-access hook
+bool InstanceScript::CheckRequiredBossesWithScripts(uint32 bossId, Player const* player) const
+{
+    bool canKill = CheckRequiredBosses(bossId, player);
+    sScriptMgr->OnInstanceCanKillBoss(instance->ToInstanceMap(), const_cast<InstanceScript*>(this),
+        bossId, const_cast<Player*>(player), canKill);
+    return canKill;
+}
+// @tswow-end
+
 bool InstanceScript::SetBossState(uint32 id, EncounterState state)
 {
     if (id < bosses.size())
@@ -431,6 +465,11 @@ bool InstanceScript::SetBossState(uint32 id, EncounterState state)
         for (Creature* minion : minions)
             if (minion)
                 UpdateMinionState(minion, state);
+
+        // @tswow-begin: generic instance lifecycle dispatch
+        sScriptMgr->OnInstanceLifecycle(instance->ToInstanceMap(), this, InstanceLifecycleEvent::BossStateChange,
+            nullptr, id, state);
+        // @tswow-end
 
         return true;
     }

@@ -263,6 +263,21 @@ void ScriptMgr::OnMapUpdate(Map* map, uint32 diff)
     });
 }
 
+// @tswow-begin: generic delayed map update dispatch
+void ScriptMgr::OnMapDelayedUpdate(Map* map, uint32 diff)
+{
+    CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_MAP_DELAYED_UPDATE, script->OnMapDelayedUpdate(map, diff));
+}
+// @tswow-end
+
+// @tswow-begin: map encounter-entry notification
+void ScriptMgr::OnMapCheckEncounter(Map* map, Player* player)
+{
+    CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_MAP_CHECK_ENCOUNTER,
+        script->OnMapCheckEncounter(map, player));
+}
+// @tswow-end
+
 void ScriptMgr::OnBeforeCreateInstanceScript(InstanceMap* instanceMap, InstanceScript** instanceData, bool load, std::string data, uint32 completedEncounterMask)
 {
     CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_BEFORE_CREATE_INSTANCE_SCRIPT, script->OnBeforeCreateInstanceScript(instanceMap, instanceData, load, data, completedEncounterMask));
@@ -272,6 +287,34 @@ void ScriptMgr::OnDestroyInstance(MapInstanced* mapInstanced, Map* map)
 {
     CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_DESTROY_INSTANCE, script->OnDestroyInstance(mapInstanced, map));
 }
+
+// @tswow-begin: generic instance lifecycle dispatch
+void ScriptMgr::OnInstanceLifecycle(InstanceMap* map, InstanceScript* instanceScript,
+    InstanceLifecycleEvent type, Player* player, uint32 value, uint32 secondaryValue, bool flag,
+    uint32* mutableValue)
+{
+    CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_INSTANCE_LIFECYCLE,
+        script->OnInstanceLifecycle(map, instanceScript, type, player, value, secondaryValue, flag, mutableValue));
+}
+// @tswow-end
+
+// @tswow-begin: generic initial instance world-state dispatch
+void ScriptMgr::OnInstanceFillInitialWorldStates(InstanceMap* map, InstanceScript* instanceScript,
+    WorldPackets::WorldState::InitWorldStates& packet)
+{
+    CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_INSTANCE_INITIAL_WORLD_STATES,
+        script->OnInstanceFillInitialWorldStates(map, instanceScript, packet));
+}
+// @tswow-end
+
+// @tswow-begin: mutable instance boss-access dispatch
+void ScriptMgr::OnInstanceCanKillBoss(InstanceMap* map, InstanceScript* instanceScript,
+    uint32 bossId, Player* player, bool& canKill)
+{
+    CALL_ENABLED_HOOKS(AllMapScript, ALLMAPHOOK_ON_INSTANCE_CAN_KILL_BOSS,
+        script->OnInstanceCanKillBoss(map, instanceScript, bossId, player, canKill));
+}
+// @tswow-end
 
 AllMapScript::AllMapScript(char const* name, std::vector<uint16> enabledHooks) : ScriptObject(name, ALLMAPHOOK_END)
 {

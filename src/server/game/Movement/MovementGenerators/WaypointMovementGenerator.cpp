@@ -25,6 +25,9 @@
 #include "MoveSplineInit.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+// @tswow-begin: generic creature AI lifecycle dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "Spell.h"
 #include "Transport.h"
 #include "SmartScriptMgr.h"
@@ -165,9 +168,15 @@ void WaypointMovementGenerator<Creature>::ProcessWaypointArrival(Creature* creat
     creature->UpdateCurrentWaypointInfo(waypointId, pathId);
 
     // Inform AI
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::WaypointReached, nullptr, nullptr,
+        waypointId, pathId);
+    // @tswow-end
     if (CreatureAI* AI = creature->AI())
     {
-        AI->MovementInform(WAYPOINT_MOTION_TYPE, waypointId);
+        // @tswow-begin: route movement completion through generic lifecycle dispatch
+        AI->NotifyMovementInform(WAYPOINT_MOTION_TYPE, waypointId);
+        // @tswow-end
         AI->WaypointReached(waypointId, pathId);
     }
 
@@ -194,6 +203,10 @@ void WaypointMovementGenerator<Creature>::ProcessWaypointArrival(Creature* creat
             AI->PathEndReached(pathId);
 
         // Re-fetch AI — PathEndReached may have despawned the creature or swapped its AI
+        // @tswow-begin: generic creature AI lifecycle dispatch
+        sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::WaypointPathEnded, nullptr, nullptr,
+            waypointId, pathId);
+        // @tswow-end
         if (CreatureAI* AI = creature->AI())
             AI->WaypointPathEnded(waypointId, pathId);
     }
@@ -348,6 +361,11 @@ void WaypointMovementGenerator<Creature>::StartMove(Creature* creature, bool rel
     creature->SignalFormationMovement();
 
     // Inform AI
+    // @tswow-begin: generic creature AI lifecycle dispatch
+    if (!relaunch)
+        sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::WaypointStarted, nullptr, nullptr,
+            waypoint.Id, i_path->Id);
+    // @tswow-end
     if (!relaunch)
         if (CreatureAI* AI = creature->AI())
             AI->WaypointStarted(waypoint.Id, i_path->Id);
@@ -412,7 +430,13 @@ bool WaypointMovementGenerator<Creature>::DoUpdate(Creature* creature, uint32 di
 
             if (CreatureAI* AI = creature->AI())
             {
-                AI->MovementInform(WAYPOINT_MOTION_TYPE, wpId);
+                // @tswow-begin: route movement completion through generic lifecycle dispatch
+                AI->NotifyMovementInform(WAYPOINT_MOTION_TYPE, wpId);
+                // @tswow-end
+                // @tswow-begin: generic creature AI lifecycle dispatch
+                sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::WaypointReached, nullptr, nullptr,
+                    wpId, wpPathId);
+                // @tswow-end
                 AI->WaypointReached(wpId, wpPathId);
             }
 
@@ -449,6 +473,10 @@ bool WaypointMovementGenerator<Creature>::DoUpdate(Creature* creature, uint32 di
                     AI->PathEndReached(endPathId);
 
                 // Re-fetch AI — PathEndReached may have despawned the creature or swapped its AI
+                // @tswow-begin: generic creature AI lifecycle dispatch
+                sScriptMgr->OnCreatureLifecycle(creature, CreatureLifecycleEvent::WaypointPathEnded, nullptr,
+                    nullptr, endWpId, endPathId);
+                // @tswow-end
                 if (CreatureAI* AI = creature->AI())
                     AI->WaypointPathEnded(endWpId, endPathId);
             }

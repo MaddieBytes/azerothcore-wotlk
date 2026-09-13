@@ -36,6 +36,10 @@ class BattlegroundQueue;
 class Channel;
 class ChatHandler;
 class Creature;
+// @tswow-begin: generic spell effect target forwarding
+class Corpse;
+class SpellEffectInfo;
+// @tswow-end
 class CreatureAI;
 class DynamicObject;
 class GameObject;
@@ -63,6 +67,10 @@ class Quest;
 class Roll;
 class Spell;
 class SpellCastTargets;
+// @tswow-begin: generic spell target-selection forwarding
+struct SpellDestination;
+class SpellImplicitTargetInfo;
+// @tswow-end
 class SpellInfo;
 class SpellScript;
 class TempSummon;
@@ -75,6 +83,12 @@ class WorldObject;
 class WorldPacket;
 class WorldSession;
 class WorldSocket;
+// @tswow-begin: generic initial instance world-state forwarding
+namespace WorldPackets::WorldState
+{
+class InitWorldStates;
+}
+// @tswow-end
 
 enum ArenaTeamInfoType : uint8;
 enum AuraRemoveMode : uint8;
@@ -118,6 +132,9 @@ struct MovementInfo;
 struct PvPDifficultyEntry;
 struct QuestStatusData;
 struct ScalingStatValuesEntry;
+// @tswow-begin: generic spell damage lifecycle forwarding
+struct SpellNonMeleeDamage;
+// @tswow-end
 struct SpellModifier;
 struct TargetInfo;
 struct VendorItem;

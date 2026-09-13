@@ -998,6 +998,9 @@ public:                                                 // opcodes handlers
 
     void HandleCompleteCinematic(WorldPacket& recvPacket);
     void HandleNextCinematicCamera(WorldPacket& recvPacket);
+    // @tswow-begin: movie completion lifecycle hook
+    void HandleCompleteMovie(WorldPacket& recvPacket);
+    // @tswow-end
 
     void HandlePageTextQueryOpcode(WorldPacket& recvPacket);
 

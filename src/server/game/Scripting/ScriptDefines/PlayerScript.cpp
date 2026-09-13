@@ -37,6 +37,23 @@ void ScriptMgr::OnPlayerGossipSelectCode(Player* player, uint32 menu_id, uint32 
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_GOSSIP_SELECT_CODE, script->OnPlayerGossipSelectCode(player, menu_id, sender, action, code));
 }
 
+// @tswow-begin: cancellable player gossip hooks
+bool ScriptMgr::CanPlayerGossipSelect(Player* player, uint32 menuId, uint32 sender, uint32 action)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_GOSSIP_SELECT,
+        !script->CanPlayerGossipSelect(player, menuId, sender, action));
+    return true;
+}
+
+bool ScriptMgr::CanPlayerGossipSelectCode(Player* player, uint32 menuId, uint32 sender, uint32 action,
+    char const* code)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_GOSSIP_SELECT_CODE,
+        !script->CanPlayerGossipSelectCode(player, menuId, sender, action, code));
+    return true;
+}
+// @tswow-end
+
 void ScriptMgr::OnPlayerCompleteQuest(Player* player, Quest const* quest)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_PLAYER_COMPLETE_QUEST, script->OnPlayerCompleteQuest(player, quest));
@@ -112,6 +129,28 @@ void ScriptMgr::OnPlayerTalentsReset(Player* player, bool noCost)
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_TALENTS_RESET, script->OnPlayerTalentsReset(player, noCost));
 }
 
+// @tswow-begin: exact talent lifecycle hooks
+void ScriptMgr::OnPlayerBeforeTalentsReset(Player* player, bool& noCost)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_BEFORE_TALENTS_RESET,
+        script->OnPlayerBeforeTalentsReset(player, noCost));
+}
+
+void ScriptMgr::OnPlayerAfterTalentsReset(Player* player, bool noCost)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_AFTER_TALENTS_RESET,
+        script->OnPlayerAfterTalentsReset(player, noCost));
+}
+
+bool ScriptMgr::CanPlayerLearnTalentSpell(Player* player, TalentEntry const* talent, uint32 rank,
+    SpellInfo const* spellInfo)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_LEARN_TALENT_SPELL,
+        !script->CanPlayerLearnTalentSpell(player, talent, rank, spellInfo));
+    return true;
+}
+// @tswow-end
+
 bool ScriptMgr::OnPlayerCanLearnTalent(Player* player, TalentEntry const* talent, uint32 rank)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_LEARN_TALENT, !script->OnPlayerCanLearnTalent(player, talent, rank));
@@ -126,6 +165,13 @@ void ScriptMgr::OnPlayerMoneyChanged(Player* player, int32& amount)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_MONEY_CHANGED, script->OnPlayerMoneyChanged(player, amount));
 }
+
+// @tswow-begin: notify modules when a player reaches a configured money cap
+void ScriptMgr::OnPlayerMoneyLimit(Player* player, int32 amount)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_MONEY_LIMIT, script->OnPlayerMoneyLimit(player, amount));
+}
+// @tswow-end
 
 void ScriptMgr::OnPlayerBeforeLootMoney(Player* player, Loot* loot)
 {
@@ -267,6 +313,14 @@ void ScriptMgr::OnPlayerUpdateArea(Player* player, uint32 oldArea, uint32 newAre
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_UPDATE_AREA, script->OnPlayerUpdateArea(player, oldArea, newArea));
 }
 
+// @tswow-begin: movie completion lifecycle hook
+void ScriptMgr::OnPlayerMovieComplete(Player* player, uint32 movieId)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_MOVIE_COMPLETE,
+        script->OnPlayerMovieComplete(player, movieId));
+}
+// @tswow-end
+
 bool ScriptMgr::OnPlayerBeforeTeleport(Player* player, uint32 mapid, float x, float y, float z, float orientation, uint32 options, Unit* target)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_ON_BEFORE_TELEPORT, !script->OnPlayerBeforeTeleport(player, mapid, x, y, z, orientation, options, target));
@@ -347,6 +401,43 @@ void ScriptMgr::OnPlayerEquip(Player* player, Item* it, uint8 bag, uint8 slot, b
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_EQUIP, script->OnPlayerEquip(player, it, bag, slot, update));
 }
 
+// @tswow-begin: item equip completion with merge state
+void ScriptMgr::OnPlayerItemEquipped(Player* player, Item* item, uint8 slot, bool isMerge)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_ITEM_EQUIPPED,
+        script->OnPlayerItemEquipped(player, item, slot, isMerge));
+}
+// @tswow-end
+// @tswow-begin: generic player item lifecycle dispatch
+void ScriptMgr::OnPlayerItemLifecycle(Player* player, PlayerItemLifecycleEvent type, Item* item,
+    ItemTemplate const* itemTemplate, WorldObject* lootedObject, uint8 bag, uint8 slot, bool flag,
+    uint32* result, int32* signedResult, bool* boolResult)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_ITEM_LIFECYCLE,
+        script->OnPlayerItemLifecycle(player, type, item, itemTemplate, lootedObject, bag, slot, flag,
+            result, signedResult, boolResult));
+}
+// @tswow-end
+
+// @tswow-begin: generic mutable player formula dispatch
+void ScriptMgr::OnPlayerFormulaCalculation(Player* player, PlayerFormulaEvent type, uint8* byteValue,
+    float* floatValue, int32* intValue, uint32 argument1, uint32 argument2, uint32 argument3,
+    uint32 argument4, uint32 argument5, bool flag)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_FORMULA_CALCULATION,
+        script->OnPlayerFormulaCalculation(player, type, byteValue, floatValue, intValue,
+            argument1, argument2, argument3, argument4, argument5, flag));
+}
+// @tswow-end
+
+// @tswow-begin: generic player loot lifecycle dispatch
+void ScriptMgr::OnPlayerLootLifecycle(Player* player, PlayerLootLifecycleEvent type, Item* item,
+    Loot* loot, WorldObject* source, LootItem* lootItem, uint32 lootType)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_LOOT_LIFECYCLE,
+        script->OnPlayerLootLifecycle(player, type, item, loot, source, lootItem, lootType));
+}
+// @tswow-end
 void ScriptMgr::OnPlayerUnequip(Player* player, Item* it)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_UNEQUIP_ITEM, script->OnPlayerUnequip(player, it));
@@ -466,6 +557,35 @@ void ScriptMgr::OnPlayerAfterUpdateMaxHealth(Player* player, float& value)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_AFTER_UPDATE_MAX_HEALTH, script->OnPlayerAfterUpdateMaxHealth(player, value));
 }
+
+// @tswow-begin: generic mutable player stat calculations
+void ScriptMgr::OnPlayerFloatStatCalculation(Player* player, PlayerStatCalculation type, float& value,
+    float argument, float secondaryArgument)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_FLOAT_STAT_CALCULATION,
+        script->OnPlayerFloatStatCalculation(player, type, value, argument, secondaryArgument));
+}
+
+void ScriptMgr::OnPlayerIntStatCalculation(Player* player, PlayerStatCalculation type, int32& value,
+    uint32 argument, Item* item)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_INT_STAT_CALCULATION,
+        script->OnPlayerIntStatCalculation(player, type, value, argument, item));
+}
+
+void ScriptMgr::OnPlayerUIntStatCalculation(Player* player, PlayerStatCalculation type, uint32& value)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_UINT_STAT_CALCULATION,
+        script->OnPlayerUIntStatCalculation(player, type, value));
+}
+
+void ScriptMgr::OnPlayerManaRegenCalculation(Player* player, float& spiritRegen, float& flatRegen,
+    int32& interruptPercent)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_MANA_REGEN_CALCULATION,
+        script->OnPlayerManaRegenCalculation(player, spiritRegen, flatRegen, interruptPercent));
+}
+// @tswow-end
 
 void ScriptMgr::OnPlayerBeforeUpdateAttackPowerAndDamage(Player* player, float& level, float& val2, bool ranged)
 {
@@ -792,6 +912,16 @@ bool ScriptMgr::OnPlayerCanInitTrade(Player* player, Player* target)
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_INIT_TRADE, !script->OnPlayerCanInitTrade(player, target));
 }
 
+// @tswow-begin: completed player trade notification
+void ScriptMgr::OnPlayerTradeCompleted(Player* player, Player* trader, Item* const* playerItems,
+    Item* const* traderItems, uint8 itemCount, uint32 playerMoney, uint32 traderMoney)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_TRADE_COMPLETED,
+        script->OnPlayerTradeCompleted(player, trader, playerItems, traderItems, itemCount,
+            playerMoney, traderMoney));
+}
+// @tswow-end
+
 bool ScriptMgr::OnPlayerCanSetTradeItem(Player* player, Item* tradedItem, uint8 tradeSlot)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_SET_TRADE_ITEM, !script->OnPlayerCanSetTradeItem(player, tradedItem, tradeSlot));
@@ -866,6 +996,21 @@ void ScriptMgr::OnPlayerQuestAccept(Player* player, Quest const* quest)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_PLAYER_QUEST_ACCEPT, script->OnPlayerQuestAccept(player, quest));
 }
+
+// @tswow-begin: generic quest state notifications
+void ScriptMgr::OnPlayerQuestStatusChanged(Player* player, Quest const* quest)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_QUEST_STATUS_CHANGED,
+        script->OnPlayerQuestStatusChanged(player, quest));
+}
+
+void ScriptMgr::OnPlayerQuestObjectiveProgress(Player* player, Quest const* quest, uint32 objectiveIndex,
+    uint16 progress)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_QUEST_OBJECTIVE_PROGRESS,
+        script->OnPlayerQuestObjectiveProgress(player, quest, objectiveIndex, progress));
+}
+// @tswow-end
 
 // Player anti cheat
 void ScriptMgr::AnticheatSetCanFlybyServer(Player* player, bool apply)

@@ -16,6 +16,9 @@
  */
 
 #include "AccountMgr.h"
+// @tswow-begin: generic battleground event dependencies
+#include "Battleground.h"
+// @tswow-end
 #include "BattlegroundAV.h"
 #include "CellImpl.h"
 #include "CreatureAISelector.h"
@@ -158,6 +161,11 @@ void GameObject::AddToWorld()
     ///- Register the gameobject for guid lookup
     if (!IsInWorld())
     {
+        // @tswow-begin: cancellable game-object world-add hook
+        if (!sScriptMgr->CanGameObjectAddWorld(this))
+            return;
+        // @tswow-end
+
         if (m_zoneScript)
             m_zoneScript->OnGameObjectCreate(this);
 
@@ -1016,6 +1024,10 @@ void GameObject::GetFishLoot(Loot* fishLoot, Player* lootOwner, bool junk /*= fa
         if (!fishLoot->empty() && !fishLoot->isLooted())
             break;
     }
+
+    // @tswow-begin: generic game-object fish-loot notification
+    sScriptMgr->OnGameObjectGenerateFishLoot(this, lootOwner, fishLoot, junk);
+    // @tswow-end
 }
 
 void GameObject::SaveToDB(bool saveAddon /*= false*/)
@@ -1462,6 +1474,11 @@ void GameObject::SwitchDoorOrButton(bool activate, bool alternative /* = false *
 
 void GameObject::Use(Unit* user)
 {
+    // @tswow-begin: cancellable game-object use hook
+    if (!sScriptMgr->CanGameObjectUse(this, user))
+        return;
+    // @tswow-end
+
     // Xinef: we cannot use go with not selectable flags
     if (HasGameObjectFlag(GO_FLAG_NOT_SELECTABLE))
         return;
@@ -2205,7 +2222,9 @@ bool GameObject::IsInRange3d(float x, float y, float z, float radius) const
            && dz < (info->maxZ * scale) + radius && dz > (info->minZ * scale) - radius;
 }
 
-void GameObject::EventInform(uint32 eventId)
+// @tswow-begin: preserve the invoker for generic battleground events
+void GameObject::EventInform(uint32 eventId, WorldObject* invoker)
+// @tswow-end
 {
     if (!eventId)
         return;
@@ -2215,6 +2234,12 @@ void GameObject::EventInform(uint32 eventId)
 
     if (m_zoneScript)
         m_zoneScript->ProcessEvent(this, eventId);
+
+    // @tswow-begin: generic battleground event dispatch
+    if (BattlegroundMap* battlegroundMap = GetMap()->ToBattlegroundMap())
+        if (Battleground* battleground = battlegroundMap->GetBG())
+            sScriptMgr->OnBattlegroundGenericEvent(battleground, this, eventId, invoker);
+    // @tswow-end
 }
 
 uint32 GameObject::GetScriptId() const
@@ -2382,7 +2407,9 @@ void GameObject::SetDestructibleState(GameObjectDestructibleState state, Player*
             break;
         case GO_DESTRUCTIBLE_DAMAGED:
             {
-                EventInform(m_goInfo->building.damagedEvent);
+                // @tswow-begin: retain the generic battleground event invoker
+                EventInform(m_goInfo->building.damagedEvent, eventInvoker);
+                // @tswow-end
 
                 sScriptMgr->OnGameObjectDamaged(this, eventInvoker);
 
@@ -2414,7 +2441,9 @@ void GameObject::SetDestructibleState(GameObjectDestructibleState state, Player*
             {
                 sScriptMgr->OnGameObjectDestroyed(this, eventInvoker);
 
-                EventInform(m_goInfo->building.destroyedEvent);
+                // @tswow-begin: retain the generic battleground event invoker
+                EventInform(m_goInfo->building.destroyedEvent, eventInvoker);
+                // @tswow-end
 
                 if (BattlegroundMap* bgMap = GetMap()->ToBattlegroundMap())
                 {
@@ -2444,7 +2473,9 @@ void GameObject::SetDestructibleState(GameObjectDestructibleState state, Player*
             }
         case GO_DESTRUCTIBLE_REBUILDING:
             {
-                EventInform(m_goInfo->building.rebuildingEvent);
+                // @tswow-begin: retain the generic battleground event invoker
+                EventInform(m_goInfo->building.rebuildingEvent, eventInvoker);
+                // @tswow-end
                 RemoveGameObjectFlag(GO_FLAG_DAMAGED | GO_FLAG_DESTROYED);
 
                 uint32 modelId = m_goInfo->displayId;

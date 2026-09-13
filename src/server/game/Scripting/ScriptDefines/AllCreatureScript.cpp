@@ -19,6 +19,21 @@
 #include "ScriptMgr.h"
 #include "ScriptMgrMacros.h"
 
+// @tswow-begin: cancellable creature world-add hook
+bool ScriptMgr::CanCreatureAddWorld(Creature* creature)
+{
+    ASSERT(creature);
+
+    bool canAdd = true;
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        if (!script->CanCreatureAddWorld(creature))
+            canAdd = false;
+    });
+    return canAdd;
+}
+// @tswow-end
+
 void ScriptMgr::OnCreatureAddWorld(Creature* creature)
 {
     ASSERT(creature);
@@ -64,6 +79,75 @@ void ScriptMgr::OnCreatureSelectLevel(CreatureTemplate const* cinfo, Creature* c
         script->OnCreatureSelectLevel(cinfo, creature);
     });
 }
+
+// @tswow-begin: generic mutable creature stat calculations
+void ScriptMgr::OnCreatureFloatStatCalculation(Creature* creature, CreatureStatCalculation type, float& value,
+    bool isGuardian, float argument)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureFloatStatCalculation(creature, type, value, isGuardian, argument);
+    });
+}
+
+void ScriptMgr::OnCreatureUIntStatCalculation(Creature* creature, CreatureStatCalculation type, uint32& value,
+    float modifier, uint32 base)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureUIntStatCalculation(creature, type, value, modifier, base);
+    });
+}
+
+void ScriptMgr::OnCreatureBaseDamageCalculation(Creature* creature, float& minimum, float& maximum,
+    float baseDamage)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureBaseDamageCalculation(creature, minimum, maximum, baseDamage);
+    });
+}
+
+void ScriptMgr::OnCreatureBaseAttackPowerCalculation(Creature* creature, uint32& attackPower,
+    uint32& rangedAttackPower)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureBaseAttackPowerCalculation(creature, attackPower, rangedAttackPower);
+    });
+}
+
+void ScriptMgr::OnCreatureAttackPowerCalculation(Creature* creature, float& base, float& modifier,
+    float& multiplier, bool isGuardian, bool ranged)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureAttackPowerCalculation(creature, base, modifier, multiplier, isGuardian, ranged);
+    });
+}
+
+void ScriptMgr::OnCreatureDamageCalculation(Creature* creature, float& minimum, float& maximum,
+    bool isGuardian, uint8 attackType)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureDamageCalculation(creature, minimum, maximum, isGuardian, attackType);
+    });
+}
+// @tswow-end
+
+// @tswow-begin: generic creature AI lifecycle dispatch
+void ScriptMgr::OnCreatureLifecycle(Creature* creature, CreatureLifecycleEvent type, WorldObject* primary,
+    WorldObject* secondary, uint32 value, uint32 secondaryValue, bool apply, SpellInfo const* spellInfo,
+    Loot* loot, ItemTemplate const* itemTemplate, bool* mutableResult, uint32* mutableValue)
+{
+    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+    {
+        script->OnCreatureLifecycle(creature, type, primary, secondary, value, secondaryValue, apply,
+            spellInfo, loot, itemTemplate, mutableResult, mutableValue);
+    });
+}
+// @tswow-end
 
 //bool ScriptMgr::CanCreatureSendListInventory(Player* player, Creature* creature, uint32 vendorEntry)
 //{

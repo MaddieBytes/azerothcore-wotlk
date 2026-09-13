@@ -16,12 +16,29 @@
  */
 
 #include "AchievementCriteriaScript.h"
+// @tswow-begin: battleground achievement-criteria dispatch dependencies
+#include "Battleground.h"
+#include "Player.h"
+// @tswow-end
 #include "ScriptMgr.h"
 
-bool ScriptMgr::OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target, uint32 criteria_id)
+// @tswow-begin: preserve criteria misc value for generic hooks
+bool ScriptMgr::OnCriteriaCheck(uint32 scriptId, Player* source, Unit* target, uint32 criteria_id,
+    uint32 miscValue)
+// @tswow-end
 {
     ASSERT(source);
     // target can be nullptr.
+
+    // @tswow-begin: battleground achievement-criteria dispatch
+    if (Battleground* battleground = source->GetBattleground())
+    {
+        bool handled = false;
+        OnBattlegroundAchievementCriteria(battleground, criteria_id, source, target, miscValue, handled);
+        if (handled)
+            return true;
+    }
+    // @tswow-end
 
     auto tempScript = ScriptRegistry<AchievementCriteriaScript>::GetScriptById(scriptId);
     return tempScript ? tempScript->OnCheck(source, target, criteria_id) : false;

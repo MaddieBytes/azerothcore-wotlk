@@ -1910,7 +1910,13 @@ InventoryResult Player::CanEquipItem(uint8 slot, uint16& dest, Item* pItem, bool
                 // do not allow equipping gear except weapons, offhands, projectiles, relics in
                 // - combat
                 // - in-progress arenas
-                if (!pProto->CanChangeEquipStateInCombat())
+                // @tswow-begin: mutable item equip-state decision
+                bool canChangeEquipState = pProto->CanChangeEquipStateInCombat();
+                sScriptMgr->OnPlayerItemLifecycle(const_cast<Player*>(this),
+                    PlayerItemLifecycleEvent::CanChangeEquipState, pItem, pProto, nullptr, 0, 0, false,
+                    nullptr, nullptr, &canChangeEquipState);
+                // @tswow-end
+                if (!canChangeEquipState)
                 {
                     if (IsInCombat())
                         return EQUIP_ERR_NOT_IN_COMBAT;
@@ -2087,7 +2093,13 @@ InventoryResult Player::CanUnequipItem(uint16 pos, bool swap) const
     // do not allow unequipping gear except weapons, offhands, projectiles, relics in
     // - combat
     // - in-progress arenas
-    if (!pProto->CanChangeEquipStateInCombat())
+    // @tswow-begin: mutable item equip-state decision
+    bool canChangeEquipState = pProto->CanChangeEquipStateInCombat();
+    sScriptMgr->OnPlayerItemLifecycle(const_cast<Player*>(this),
+        PlayerItemLifecycleEvent::CanChangeEquipState, pItem, pProto, nullptr, 0, 0, false,
+        nullptr, nullptr, &canChangeEquipState);
+    // @tswow-end
+    if (!canChangeEquipState)
     {
         if (IsInCombat())
             return EQUIP_ERR_NOT_IN_COMBAT;
@@ -2118,6 +2130,14 @@ InventoryResult Player::CanBankItem(uint8 bag, uint8 slot, ItemPosCountVec& dest
     ItemTemplate const* pProto = pItem->GetTemplate();
     if (!pProto)
         return swap ? EQUIP_ERR_ITEMS_CANT_BE_SWAPPED : EQUIP_ERR_ITEM_NOT_FOUND;
+
+    // @tswow-begin: mutable item bank decision
+    uint32 bankResult = EQUIP_ERR_OK;
+    sScriptMgr->OnPlayerItemLifecycle(const_cast<Player*>(this), PlayerItemLifecycleEvent::Bank,
+        pItem, pProto, nullptr, bag, slot, swap, &bankResult);
+    if (bankResult != EQUIP_ERR_OK)
+        return static_cast<InventoryResult>(bankResult);
+    // @tswow-end
 
     // Xinef: Removed next loot generated check
     if (pItem->GetGUID() == GetLootGUID())
@@ -2344,7 +2364,12 @@ InventoryResult Player::CanUseItem(Item* pItem, bool not_loading) const
             if (pProto->RequiredReputationFaction && uint32(GetReputationRank(pProto->RequiredReputationFaction)) < pProto->RequiredReputationRank)
                 return EQUIP_ERR_CANT_EQUIP_REPUTATION;
 
-            return EQUIP_ERR_OK;
+            // @tswow-begin: mutable concrete-item use decision
+            uint32 useResult = EQUIP_ERR_OK;
+            sScriptMgr->OnPlayerItemLifecycle(const_cast<Player*>(this), PlayerItemLifecycleEvent::CanUse,
+                pItem, pProto, nullptr, 0, 0, false, &useResult);
+            // @tswow-end
+            return static_cast<InventoryResult>(useResult);
         }
     }
     return EQUIP_ERR_ITEM_NOT_FOUND;
@@ -2443,6 +2468,13 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
 
 InventoryResult Player::CanRollForItemInLFG(ItemTemplate const* proto, WorldObject const* lootedObject) const
 {
+    // @tswow-begin: mutable early LFG roll decision
+    int32 rollResult = -1;
+    sScriptMgr->OnPlayerItemLifecycle(const_cast<Player*>(this), PlayerItemLifecycleEvent::LFGRollEarly,
+        nullptr, proto, const_cast<WorldObject*>(lootedObject), 0, 0, false, nullptr, &rollResult);
+    if (rollResult >= 0)
+        return static_cast<InventoryResult>(rollResult);
+    // @tswow-end
     if (!GetGroup() || !GetGroup()->isLFGGroup(true))
         return EQUIP_ERR_OK;    // not in LFG group
 
@@ -2930,6 +2962,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
         sScriptMgr->OnPlayerEquip(this, pItem2, bag, slot, update);
+        // @tswow-begin: item equip completion with merge state
+        sScriptMgr->OnPlayerItemEquipped(this, pItem2, slot, true);
+        // @tswow-end
         return pItem2;
     }
 
@@ -2938,6 +2973,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
 
     sScriptMgr->OnPlayerEquip(this, pItem, bag, slot, update);
+    // @tswow-begin: item equip completion with merge state
+    sScriptMgr->OnPlayerItemEquipped(this, pItem, slot, false);
+    // @tswow-end
     UpdateForQuestWorldObjects();
     return pItem;
 }
@@ -3134,6 +3172,14 @@ void Player::DestroyItem(uint8 bag, uint8 slot, bool update)
     Item* pItem = GetItemByPos(bag, slot);
     if (pItem)
     {
+        // @tswow-begin: cancellable early item destruction
+        bool canDestroy = true;
+        sScriptMgr->OnPlayerItemLifecycle(this, PlayerItemLifecycleEvent::DestroyEarly, pItem,
+            pItem->GetTemplate(), nullptr, bag, slot, false, nullptr, nullptr, &canDestroy);
+        if (!canDestroy)
+            return;
+        // @tswow-end
+
         LOG_DEBUG("entities.player.items", "STORAGE: DestroyItem bag = {}, slot = {}, item = {}", bag, slot, pItem->GetEntry());
         // Also remove all contained items if the item is a bag.
         // This if () prevents item saving crashes if the condition for a bag to be empty before being destroyed was bypassed somehow.

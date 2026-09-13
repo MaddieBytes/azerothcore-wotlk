@@ -642,6 +642,11 @@ void WorldSession::HandleAcceptTradeOpcode(WorldPacket& /*recvPacket*/)
         if (his_spell)
             his_spell->prepare(&his_targets);
 
+        // @tswow-begin: completed player trade notification
+        sScriptMgr->OnPlayerTradeCompleted(_player, trader, myItems, hisItems,
+            TRADE_SLOT_TRADED_COUNT, my_trade->GetMoney(), his_trade->GetMoney());
+        // @tswow-end
+
         // cleanup
         clearAcceptTradeMode(my_trade, his_trade);
         delete _player->m_trade;

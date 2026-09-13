@@ -24,6 +24,9 @@
 #include "GameObject.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+// @tswow-begin: battleground objective action dispatch
+#include "ScriptMgr.h"
+// @tswow-end
 #include "SpellAuras.h"
 #include "WorldPacket.h"
 #include "WorldStatePackets.h"
@@ -922,6 +925,9 @@ uint32 BattlegroundAV::GetObjectThroughNode(BG_AV_Nodes node)
 
 void BattlegroundAV::EventPlayerClickedOnFlag(Player* source, GameObject* gameObject)
 {
+    // @tswow-begin: battleground objective action dispatch
+    sScriptMgr->OnBattlegroundAction(this, BattlegroundActionEvent::ClickFlag, source, gameObject);
+    // @tswow-end
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
     int32 object = GetObjectType(gameObject->GetGUID());

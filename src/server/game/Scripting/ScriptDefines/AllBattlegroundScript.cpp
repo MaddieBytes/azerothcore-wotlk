@@ -119,6 +119,67 @@ bool ScriptMgr::GetPlayerMatchmakingRating(ObjectGuid playerGuid, BattlegroundTy
     CALL_ENABLED_BOOLEAN_HOOKS_WITH_DEFAULT_FALSE(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_GET_PLAYER_MATCHMAKING_RATING, script->GetPlayerMatchmakingRating(playerGuid, bgTypeId, outRating));
 }
 
+// @tswow-begin: generic battleground lifecycle dispatch
+void ScriptMgr::OnBattlegroundLifecycle(Battleground* bg, BattlegroundLifecycleEvent type, Player* player,
+    uint32* value, uint32 secondaryValue, bool flag, bool* result)
+{
+    CALL_ENABLED_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_LIFECYCLE,
+        script->OnBattlegroundLifecycle(bg, type, player, value, secondaryValue, flag, result));
+}
+// @tswow-end
+
+// @tswow-begin: mutable battleground spawn dispatch
+void ScriptMgr::OnBattlegroundSpawn(Battleground* bg, BattlegroundSpawnEvent type, uint32 slot,
+    uint32& entry, uint8* stateOrTeam, float& x, float& y, float& z, float& o,
+    float* rotation0, float* rotation1, float* rotation2, float* rotation3, uint32* respawnTime)
+{
+    CALL_ENABLED_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_SPAWN,
+        script->OnBattlegroundSpawn(bg, type, slot, entry, stateOrTeam, x, y, z, o,
+            rotation0, rotation1, rotation2, rotation3, respawnTime));
+}
+// @tswow-end
+
+// @tswow-begin: mutable battleground score serialization hook
+bool ScriptMgr::CanAppendBattlegroundScore(Battleground* bg, BattlegroundScore* score, WorldPacket& packet)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_CAN_APPEND_BATTLEGROUND_SCORE,
+        !script->CanAppendBattlegroundScore(bg, score, packet));
+}
+// @tswow-end
+
+// @tswow-begin: mutable battleground type selection
+void ScriptMgr::OnBattlegroundTypeSelection(uint32 candidateType, float* weight,
+    uint32 originalType, uint32* selectedType)
+{
+    CALL_ENABLED_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_TYPE_SELECTION,
+        script->OnBattlegroundTypeSelection(candidateType, weight, originalType, selectedType));
+}
+// @tswow-end
+
+// @tswow-begin: battleground objective action dispatch
+void ScriptMgr::OnBattlegroundAction(Battleground* bg, BattlegroundActionEvent type,
+    Player* player, GameObject* target)
+{
+    CALL_ENABLED_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_ACTION,
+        script->OnBattlegroundAction(bg, type, player, target));
+}
+// @tswow-end
+
+// @tswow-begin: battleground criteria and generic-event dispatch
+void ScriptMgr::OnBattlegroundAchievementCriteria(Battleground* bg, uint32 criteriaId,
+    Player* source, Unit* target, uint32 miscValue, bool& handled)
+{
+    CALL_ENABLED_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_ACHIEVEMENT_CRITERIA,
+        script->OnBattlegroundAchievementCriteria(bg, criteriaId, source, target, miscValue, handled));
+}
+
+void ScriptMgr::OnBattlegroundGenericEvent(Battleground* bg, WorldObject* object, uint32 eventId,
+    WorldObject* invoker)
+{
+    CALL_ENABLED_HOOKS(AllBattlegroundScript, ALLBATTLEGROUNDHOOK_ON_BATTLEGROUND_GENERIC_EVENT,
+        script->OnBattlegroundGenericEvent(bg, object, eventId, invoker));
+}
+// @tswow-end
 AllBattlegroundScript::AllBattlegroundScript(char const* name, std::vector<uint16> enabledHooks) :
     ScriptObject(name, ALLBATTLEGROUNDHOOK_END)
 {

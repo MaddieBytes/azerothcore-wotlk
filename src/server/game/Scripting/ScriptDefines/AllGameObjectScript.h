@@ -26,6 +26,18 @@ protected:
     AllGameObjectScript(char const* name);
 
 public:
+    // @tswow-begin: cancellable game-object world-add hook
+    [[nodiscard]] virtual bool CanGameObjectAddWorld(GameObject* /*go*/) { return true; }
+    // @tswow-end
+
+    // @tswow-begin: generic game-object interaction and loot notifications
+    [[nodiscard]] virtual bool CanGameObjectUse(GameObject* /*go*/, Unit* /*user*/) { return true; }
+    virtual void OnGameObjectDialogStatus(GameObject* /*go*/, Player* /*player*/) { }
+    virtual void OnGameObjectGenerateLoot(GameObject* /*go*/, Player* /*player*/) { }
+    virtual void OnGameObjectGenerateFishLoot(GameObject* /*go*/, Player* /*player*/, Loot* /*loot*/,
+        bool /*junk*/) { }
+    // @tswow-end
+
     /**
      * @brief This hook runs after add game object in world
      *
