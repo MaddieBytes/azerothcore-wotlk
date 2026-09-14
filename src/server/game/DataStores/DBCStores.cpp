@@ -588,8 +588,14 @@ void LoadDBCStores(std::string const& dataPath)
             }
 
             // valid taxi network node
-            uint8  field   = (uint8)((i - 1) / 32);
+            uint32 field   = (i - 1) / 32;
             uint32 submask = 1 << ((i - 1) % 32);
+
+            // @tswow-begin: keep DBC-only taxi nodes outside the fixed client taxi mask
+            if (field >= TaxiMaskSize)
+                continue;
+            // @tswow-end
+
             sTaxiNodesMask[field] |= submask;
 
             if (node->MountCreatureID[0] && node->MountCreatureID[0] != 32981)
