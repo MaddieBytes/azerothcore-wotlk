@@ -137,7 +137,9 @@ enum Classes
 };
 
 // max+1 for player class
-#define MAX_CLASSES       12
+// @tswow-begin: reserve DBC-backed slots for module-defined player classes
+#define MAX_CLASSES       32
+// @tswow-end
 
 #define CLASSMASK_ALL_PLAYABLE \
     ((1<<(CLASS_WARRIOR-1))|(1<<(CLASS_PALADIN-1))|(1<<(CLASS_HUNTER-1))| \
